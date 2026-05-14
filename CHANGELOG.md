@@ -5,6 +5,13 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.13.0] - 2026-05-14
+
+Admins can now toggle the GRC (Governance, Risk, Compliance) module on or off, mirroring the existing BPM, PPM and TurboLens toggles.
+
+### Added
+- **GRC module toggle in admin settings.** New switch on Settings → General → Modules enables or disables the entire Governance, Risk and Compliance workspace. When disabled, the GRC top-level navigation item is hidden, the `/grc` and `/grc/risks/:id` routes render the standard "module disabled" placeholder, and the toggle's state is primed at boot via `/settings/bootstrap` so there is no flash. The setting is persisted in `app_settings.general_settings.grcEnabled`, defaults to `True` for existing installs, and exposes the same admin-only `GET / PATCH /settings/grc-enabled` endpoints as the other module toggles. The underlying `risks.*`, `security_compliance.*` and `grc.*` permissions are unchanged — disabling the module hides the UI surface without revoking access.
+
 ## [1.12.0] - 2026-05-14
 
 The TurboLens CVE scanner has been removed. The Security tab is now Compliance-only, and the on-demand regulation gap analysis remains fully intact.
