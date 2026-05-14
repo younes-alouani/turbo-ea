@@ -1312,8 +1312,15 @@ TOGAF-aligned Risk Register mounted at `/api/v1/risks`, plus a card sub-route fo
 | DELETE | `/risks/{id}` | `risks.manage` | Delete risk + clean up the owner's system Todo |
 | POST | `/risks/{id}/cards` | `risks.manage` | Link one or more cards (idempotent) |
 | DELETE | `/risks/{id}/cards/{card_id}` | `risks.manage` | Unlink a single card |
-| POST | `/risks/promote/compliance/{finding_id}` | `risks.manage` + `security_compliance.view` | Promote a compliance finding to a risk (idempotent — returns existing one if already promoted). Seeds title, description, category, probability/impact, mitigation, and links the finding's card. |
+| POST | `/risks/promote/compliance/{finding_id}` | `risks.manage` + `security_compliance.view` | Promote a compliance finding to a risk (idempotent — returns existing one if already promoted). Seeds title, description, category, probability/impact, links the finding's card, and **spawns a one-shot mitigation task from the finding's remediation text**. |
 | GET | `/cards/{id}/risks` | `risks.view` | All risks linked to a card (used by CardDetail → Risks tab) |
+| GET | `/risks/{id}/mitigation-tasks` | `risks.view` | List mitigation tasks for a risk (with full per-task occurrence history). |
+| POST | `/risks/{id}/mitigation-tasks` | `risks.manage` | Create a mitigation task. Auto-creates occurrence #1 and a system Todo on the assignee. |
+| PATCH | `/mitigation-tasks/{id}` | `risks.manage` | Update title / description / owner / recurrence / due date / is_active. Owner changes propagate to the current open occurrence (and its Todo); past completed occurrences stay frozen. |
+| DELETE | `/mitigation-tasks/{id}` | `risks.manage` | Delete a task. Cascades to occurrences and removes the linked system Todos. |
+| POST | `/mitigation-tasks/{id}/occurrences/{occ_id}/complete` | `risks.manage` **or** assignee of the occurrence | Mark an occurrence done. Snapshots `owner_at_completion`. For recurring tasks, opens the next occurrence with `due_date = previous_due_date + interval` (calendar-correct). For one-shot tasks, flips `is_active = false`. |
+| POST | `/mitigation-tasks/{id}/occurrences/{occ_id}/skip` | `risks.manage` | Skip a cycle (recurring tasks roll forward as usual). |
+| GET | `/mitigation-tasks/{id}/occurrences` | `risks.view` | Full audit history for one task, including `owner_at_completion` snapshots. |
 
 Owner assignment on create / patch / promote auto-creates a single `is_system` Todo on the owner's Todos page (description `[Risk R-xxxxxx] title`, link back to the risk, due-date mirrors `target_resolution_date`, auto-done when the risk reaches mitigated / monitoring / accepted / closed) and fires a `risk_assigned` in-app + email-capable notification whenever the owner actually changes (including self-assignment — `risk_assigned` is whitelisted in `notification_service.allow_self_types`).
 
@@ -1362,10 +1369,12 @@ Landscape-level risk register aligned to TOGAF ADM Phase G. Separate from `PpmRi
 
 | Table | Model | Purpose |
 |-------|-------|---------|
-| `risks` | `Risk` | One row per risk. Fields: reference (`R-000123`), title, description, category, source_type / source_ref, initial + residual probability × impact (with derived level), mitigation, owner_id, target_resolution_date, status, acceptance_rationale + accepted_by + accepted_at, created_by |
+| `risks` | `Risk` | One row per risk. Fields: reference (`R-000123`), title, description, category, source_type / source_ref, initial + residual probability × impact (with derived level), owner_id, target_resolution_date, status, acceptance_rationale + accepted_by + accepted_at, created_by. **No `mitigation` text column** — mitigation is task-driven (see below). |
 | `risk_cards` | `RiskCard` | M:N junction between risks and cards (composite PK risk_id + card_id, role defaulting to `affected`) |
+| `risk_mitigation_tasks` | `RiskMitigationTask` | Owned mitigation activities attached to a risk. One-shot (default) or recurring (`recurrence_unit` = `days`/`weeks`/`months`/`years`, `recurrence_interval` ≥ 1). Carries title, description, current `owner_id`, and `is_active` (flips false when a one-shot task completes). |
+| `risk_mitigation_task_occurrences` | `RiskMitigationTaskOccurrence` | One row per scheduled instance of a task. Captures `sequence` (monotonic per task), `due_date`, `assigned_owner_id` (snapshot when the cycle opens), `status` (`open` / `done` / `skipped`), `completed_at` / `completed_by` / **`owner_at_completion`** (snapshot when the cycle closes — may differ from `assigned_owner_id` if the owner was changed mid-cycle), and `completion_notes`. Recurring tasks roll forward calendar-correctly on completion: `next_due = due_date + interval`, day-of-month clamped (Jan 31 + 1 month → Feb 28). |
 
-The `turbolens_compliance_findings` table also carries a nullable `risk_id` back-link so findings that have been promoted show **Open risk R-000123** instead of **Create risk** (idempotent promotion).
+The `turbolens_compliance_findings` table also carries a nullable `risk_id` back-link so findings that have been promoted show **Open risk R-000123** instead of **Create risk** (idempotent promotion). Promoting a finding now spawns a one-shot mitigation task seeded from the finding's `remediation` text instead of writing free-text guidance into the dropped `mitigation` column.
 
 ### Backend modules
 
@@ -1374,7 +1383,9 @@ The `turbolens_compliance_findings` table also carries a nullable `risk_id` back
 | `models/risk.py` | `Risk` + `RiskCard` SQLAlchemy models |
 | `schemas/risk.py` | Pydantic I/O models with typed literals for category, level, probability, impact, status |
 | `services/risk_service.py` | Pure helpers: `derive_level` (4×4 probability × impact matrix), `validate_status_transition`, `next_reference` (`R-000001` monotonic), `link_cards`, `promote_compliance_finding`, `risk_to_dict`, `compute_metrics`, `build_level_matrix` |
+| `services/risk_mitigation_task_service.py` | Mitigation-task lifecycle: `compute_next_due` (calendar-correct month/year math via `_add_months`), `create_task_with_first_occurrence`, `complete_occurrence` / `skip_occurrence` (snapshots `owner_at_completion`, deactivates one-shot tasks, rolls forward recurring tasks), `apply_task_owner_change` (propagates parent-task owner edits to the current open occurrence — past occurrences stay frozen), `sync_occurrence_todo` (mirrors `sync_owner_todo` but keyed per open occurrence), `publish_task_event` (fan-out to linked cards). |
 | `api/v1/risks.py` | CRUD + card linking + promote + metrics + `GET /cards/{id}/risks`. Includes `sync_owner_todo()` which creates / updates / deletes an `is_system` Todo on the owner and fires a `risk_assigned` notification whenever the owner changes (self-assignment included — whitelisted in `allow_self_types`). |
+| `api/v1/risk_mitigation_tasks.py` | Mitigation-task endpoints. `GET/POST /risks/{id}/mitigation-tasks`, `PATCH/DELETE /mitigation-tasks/{id}`, `POST /mitigation-tasks/{id}/occurrences/{occ_id}/complete` and `/skip`, `GET /mitigation-tasks/{id}/occurrences` (full audit history). Permission: `risks.view` to read; `risks.manage` to mutate; **carve-out** — a user without `risks.manage` who is the `assigned_owner_id` of an open occurrence can complete that occurrence so assignees don't have to escalate just to mark their own control review done. Skip always requires full `risks.manage`. |
 
 ### Key behaviour
 
@@ -1382,6 +1393,7 @@ The `turbolens_compliance_findings` table also carries a nullable `risk_id` back
 - **Derived levels** (`initial_level`, `residual_level`) are computed server-side via `derive_level()` and treated as read-only by the API layer.
 - **Promote-from-finding** is idempotent — the compliance finding's `risk_id` is populated on promotion and a re-promote returns the existing risk.
 - **Owner → Todo → Notification** loop: assignment (from create, patch, or promote) creates a linked Todo on the owner's Todos page and sends an in-app + email-capable `risk_assigned` notification. The Todo auto-marks done when the risk reaches `mitigated` / `monitoring` / `accepted` / `closed`, and is removed when the owner is cleared or the risk is deleted.
+- **Task-driven mitigation.** Mitigation is captured as owned tasks under `risk_mitigation_tasks` rather than free-text. Tasks are one-shot by default; setting `recurrence_unit` (`days` / `weeks` / `months` / `years`) plus `recurrence_interval` ≥ 1 makes them recurring controls (e.g. "Check access rights every 6 months"). Recurrence is **completion-driven** — on close (done or skipped) of one occurrence, the next occurrence opens with `due_date = previous_due_date + interval`. Each occurrence snapshots `assigned_owner_id` at open and `owner_at_completion` at close, so the audit answer to "who signed off on the Jan 2024 review?" is preserved even after years of owner rotation. Per-occurrence system Todos sync to the assignee (link `/ea-delivery/risks/{risk_id}?task={task_id}#occurrence-{occurrence_id}`); a `task_assigned` notification fires on every fresh assignment (cycle rollover included, whitelisted for self). `risk_mitigation_task.*` events (`created` / `updated` / `completed` / `skipped` / `deleted`) fan out to every linked card so the per-card history timeline picks them up. **Residual scoring stays manual** — task completion does **not** auto-adjust the residual matrix; the Risk Detail page surfaces "X/Y open · Z overdue" chips alongside the residual block as context for the human assessment (ISO 31000-aligned). Promoting a TurboLens compliance finding spawns a one-shot mitigation task from the finding's `remediation` text.
 
 ### Permissions
 
@@ -1390,10 +1402,15 @@ The `turbolens_compliance_findings` table also carries a nullable `risk_id` back
 
 ### Frontend modules
 
-- `features/ea-delivery/risks/RiskMatrix.tsx` — shared 4×4 clickable heatmap used by Register and Detail pages.
-- `features/ea-delivery/risks/CreateRiskDialog.tsx` — reused for manual create and for promoting compliance findings, including an Owner picker so assignment happens at creation time.
-- `features/ea-delivery/risks/RiskRegisterPage.tsx` — register list view (embedded as a tab in EA Delivery).
-- `features/ea-delivery/risks/RiskDetailPage.tsx` — full TOGAF layout: Identification → Initial assessment → Mitigation & residual (with Owner autocomplete, Target date, residual matrix) → Affected cards (M:N) → Status workflow (primary Next step + secondary side actions + stepper) → Audit.
+- `features/grc/risk/RiskMatrix.tsx` — shared 4×4 clickable heatmap used by Register and Detail pages.
+- `features/grc/risk/CreateRiskDialog.tsx` — reused for manual create and for promoting compliance findings, including an Owner picker so assignment happens at creation time.
+- `features/grc/risk/RiskRegisterPage.tsx` — register list view (embedded as a tab in GRC at `/grc?tab=risk`).
+- `features/grc/risk/RiskDetailPage.tsx` — full TOGAF layout: Identification → Initial assessment → **Mitigation tasks panel** (replaces the old free-text field) → Residual assessment (with Owner autocomplete, Target date, residual matrix, task-summary chips for context) → Affected cards (M:N) → Status workflow (primary Next step + secondary side actions + stepper) → Audit.
+- `features/grc/risk/mitigation/MitigationTasksPanel.tsx` — task list with per-task expandable history. Add / edit / complete / skip / delete actions.
+- `features/grc/risk/mitigation/MitigationTaskDialog.tsx` — create / edit dialog (title, description, owner autocomplete, due date, "Repeats" Switch + unit/interval picker).
+- `features/grc/risk/mitigation/CompleteOccurrenceDialog.tsx` — confirm + optional completion notes when marking an occurrence done or skipped.
+- `features/grc/risk/mitigation/OccurrenceHistoryList.tsx` — read-only audit list per cycle, including the `owner_at_completion` snapshot.
+- `features/grc/risk/mitigation/recurrenceLabel.ts` — pure helper that formats `(unit, interval)` → translation-aware label ("One-shot", "Every 6 months", etc.). Unit-tested.
 - `features/cards/sections/RisksTab.tsx` — Card Detail → Risks tab listing all risks linked to that card.
 
 ---

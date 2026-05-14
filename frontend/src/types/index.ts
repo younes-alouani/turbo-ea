@@ -1454,7 +1454,6 @@ export interface Risk {
   initial_impact: RiskImpact;
   initial_level: RiskLevel;
 
-  mitigation: string | null;
   residual_probability: RiskProbability | null;
   residual_impact: RiskImpact | null;
   residual_level: RiskLevel | null;
@@ -1480,6 +1479,43 @@ export interface RiskListPage {
   total: number;
   page: number;
   page_size: number;
+}
+
+export type RecurrenceUnit = "none" | "days" | "weeks" | "months" | "years";
+export type MitigationOccurrenceStatus = "open" | "done" | "skipped";
+
+export interface MitigationTaskOccurrence {
+  id: string;
+  task_id: string;
+  sequence: number;
+  assigned_owner_id: string | null;
+  assigned_owner_name: string | null;
+  due_date: string | null;
+  status: MitigationOccurrenceStatus;
+  completed_at: string | null;
+  completed_by: string | null;
+  completed_by_name: string | null;
+  owner_at_completion: string | null;
+  owner_at_completion_name: string | null;
+  completion_notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface MitigationTask {
+  id: string;
+  risk_id: string;
+  title: string;
+  description: string | null;
+  owner_id: string | null;
+  owner_name: string | null;
+  recurrence_unit: RecurrenceUnit;
+  recurrence_interval: number;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  occurrences: MitigationTaskOccurrence[];
 }
 
 export interface RiskMetrics {

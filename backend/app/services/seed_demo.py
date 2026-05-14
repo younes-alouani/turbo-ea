@@ -5742,6 +5742,10 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
     """
     try:
         from app.models.risk import Risk, RiskCard
+        from app.models.risk_mitigation_task import (
+            RiskMitigationTask,
+            RiskMitigationTaskOccurrence,
+        )
         from app.services.risk_service import derive_level
     except ImportError:
         return 0
@@ -5800,6 +5804,18 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
                 "Sign updated SCCs, enable EU-only data residency on the "
                 "HubSpot tenant, record DPIA in the compliance portal."
             ),
+            "recurring_tasks": [
+                {
+                    "title": "Re-attest cross-border transfer documentation",
+                    "description": (
+                        "Annual GDPR review: confirm SCCs still cover all sub-processors "
+                        "and DPIA reflects current data flows."
+                    ),
+                    "recurrence_unit": "months",
+                    "recurrence_interval": 12,
+                    "due": today + timedelta(days=365),
+                },
+            ],
             "cards": ["app_hubspot"],
         },
         {
@@ -5876,6 +5892,18 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
             ),
             "residual_probability": "low",
             "residual_impact": "medium",
+            "recurring_tasks": [
+                {
+                    "title": "Quarterly OT incident response tabletop",
+                    "description": (
+                        "Run the NIS2-aligned playbook with the OT SOC team; capture lessons "
+                        "learned and update runbooks."
+                    ),
+                    "recurrence_unit": "months",
+                    "recurrence_interval": 3,
+                    "due": today + timedelta(days=30),
+                },
+            ],
             "cards": ["app_nexascada", "app_opcenter"],
         },
         {
@@ -5952,7 +5980,6 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
             initial_probability=r["initial_probability"],
             initial_impact=r["initial_impact"],
             initial_level=derive_level(r["initial_probability"], r["initial_impact"]) or "medium",
-            mitigation=r.get("mitigation"),
             residual_probability=r.get("residual_probability"),
             residual_impact=r.get("residual_impact"),
             residual_level=derive_level(r.get("residual_probability"), r.get("residual_impact")),
@@ -5970,6 +5997,80 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
             cid = card(ref)
             if cid:
                 db.add(RiskCard(risk_id=risk.id, card_id=cid))
+        # Seed a one-shot mitigation task from the legacy mitigation
+        # text so a fresh SEED_DEMO install shows the task-driven
+        # mitigation panel populated rather than empty. The recurring
+        # GDPR / NIS2 entries below get an extra recurring control review
+        # task so the recurrence UI has demo data too.
+        mitigation_text = r.get("mitigation")
+        if mitigation_text:
+            task = RiskMitigationTask(
+                id=__import__("uuid").uuid4(),
+                risk_id=risk.id,
+                title="Initial mitigation plan",
+                description=mitigation_text,
+                owner_id=r.get("owner"),
+                recurrence_unit="none",
+                recurrence_interval=1,
+                is_active=r["status"] not in ("mitigated", "monitoring", "closed", "accepted"),
+                created_by=admin_id,
+            )
+            db.add(task)
+            await db.flush()
+            occurrence = RiskMitigationTaskOccurrence(
+                id=__import__("uuid").uuid4(),
+                task_id=task.id,
+                sequence=1,
+                assigned_owner_id=r.get("owner"),
+                due_date=r.get("target"),
+                status=(
+                    "done"
+                    if r["status"] in ("mitigated", "monitoring", "closed", "accepted")
+                    else "open"
+                ),
+                completed_at=(
+                    now
+                    if r["status"] in ("mitigated", "monitoring", "closed", "accepted")
+                    else None
+                ),
+                completed_by=(
+                    admin_id
+                    if r["status"] in ("mitigated", "monitoring", "closed", "accepted")
+                    else None
+                ),
+                owner_at_completion=(
+                    r.get("owner")
+                    if r["status"] in ("mitigated", "monitoring", "closed", "accepted")
+                    else None
+                ),
+            )
+            db.add(occurrence)
+        # Showcase recurring tasks on a couple of risks.
+        recurring_tasks = r.get("recurring_tasks") or []
+        for rt in recurring_tasks:
+            rtask = RiskMitigationTask(
+                id=__import__("uuid").uuid4(),
+                risk_id=risk.id,
+                title=rt["title"],
+                description=rt.get("description"),
+                owner_id=r.get("owner"),
+                recurrence_unit=rt["recurrence_unit"],
+                recurrence_interval=rt["recurrence_interval"],
+                is_active=True,
+                created_by=admin_id,
+            )
+            db.add(rtask)
+            await db.flush()
+            db.add(
+                RiskMitigationTaskOccurrence(
+                    id=__import__("uuid").uuid4(),
+                    task_id=rtask.id,
+                    sequence=1,
+                    assigned_owner_id=r.get("owner"),
+                    due_date=rt.get("due"),
+                    status="open",
+                )
+            )
         count += 1
     await db.flush()
     return count

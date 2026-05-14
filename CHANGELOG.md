@@ -5,6 +5,17 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.13.0] - 2026-05-14
+
+Mitigation on the EA Risk Register becomes task-driven. The legacy free-text `mitigation` field is replaced with owned, optionally recurring mitigation tasks that surface in the assignee's Todo list and capture per-occurrence completion history (including who owned the task at the time each cycle closed).
+
+### Added
+- **Mitigation tasks on every risk.** Each risk can carry multiple mitigation tasks attached via the new `/risks/{id}/mitigation-tasks` endpoint. Tasks are one-shot by default; toggling "Repeats" turns them into recurring control reviews (e.g. "Check access rights every 6 months") with calendar-correct date math — Jan 31 + 1 month → Feb 28. Each task accumulates one `risk_mitigation_task_occurrences` row per cycle, snapshotting both the assigned owner at occurrence open and the owner-at-completion when it closes, so the audit trail survives owner rotation across years. Tasks the user is assigned to land in `/todos` as `is_system` Todos with deep links back to the risk; on completion the Todo closes and (for recurring tasks) the next cycle's Todo opens automatically. Risk owner can complete their own occurrence without `risks.manage`; skip requires the full permission. Risk Detail page shows the new Mitigation tasks panel in place of the old text field, with per-task expandable cycle history and a "X/Y open · Z overdue" chip strip next to the residual block as context (residual stays manually set — ISO 31000-aligned, no auto-scoring). Promoting a TurboLens compliance finding now seeds a one-shot mitigation task from the finding's remediation text instead of writing it into the dropped `mitigation` column.
+- **`risk_mitigation_task.*` audit events.** `created`, `updated`, `completed`, `skipped`, and `deleted` events are fanned out to every linked card so the existing card-history timeline picks them up. Each completion event captures `completed_by`, `owner_at_completion`, and any free-text completion notes.
+
+### Removed
+- **`risks.mitigation` column.** Migration 085 drops the column outright (clean cut — no data migration). All `RiskCreate` / `RiskUpdate` / `RiskPromoteRequest` / `RiskOut` schemas, `risk_to_dict`, and the corresponding frontend `Risk.mitigation` field, `CreateRiskDialog` TextField, and `RiskDetailPage` TextField are gone. i18n keys `risks.field.mitigation` and `risks.section.mitigation` are removed from all eight locales; the residual section is now keyed as `risks.section.residual`.
+
 ## [1.12.0] - 2026-05-14
 
 The TurboLens CVE scanner has been removed. The Security tab is now Compliance-only, and the on-demand regulation gap analysis remains fully intact.
