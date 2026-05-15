@@ -2,6 +2,9 @@
 
 The **GRC** module brings Governance, Risk and Compliance into a single workspace at `/grc`. It consolidates work that previously lived across EA Delivery and TurboLens so an architect, a risk owner and a compliance reviewer can stand on common ground.
 
+!!! note
+    The GRC module can be enabled or disabled by an administrator in [Settings](../admin/settings.md). When disabled, GRC navigation and features are hidden.
+
 GRC has three tabs:
 
 - **Governance** — EA Principles and Architecture Decision Records (ADRs).

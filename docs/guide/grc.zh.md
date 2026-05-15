@@ -2,6 +2,9 @@
 
 **GRC** 模块将治理（Governance）、风险（Risk）与合规（Compliance）整合到 `/grc` 下的统一工作区。它把原本散布于 EA 交付与 TurboLens 之间的工作合并起来，让架构师、风险责任人与合规审查者可以在共同的基础上协作。
 
+!!! note
+    GRC 模块可以由管理员在[设置](../admin/settings.md)中启用或禁用。禁用后，GRC 导航和功能将被隐藏。
+
 GRC 共有三个标签页：
 
 任意标签页都可以通过 `/grc?tab=governance`、`/grc?tab=risk` 或 `/grc?tab=compliance` 直接深链。
