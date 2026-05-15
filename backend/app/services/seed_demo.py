@@ -5746,6 +5746,7 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
             RiskMitigationTask,
             RiskMitigationTaskOccurrence,
         )
+        from app.models.todo import Todo
         from app.services.risk_service import derive_level
     except ImportError:
         return 0
@@ -5859,6 +5860,27 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
                 "Rotate all secrets; move to Key Vault; enforce via the "
                 "shared build-pipeline template."
             ),
+            "recurring_tasks": [
+                {
+                    "title": "Weekly Jenkins build credential audit",
+                    "description": (
+                        "Scan active Jenkins build jobs for plain-text secrets; "
+                        "rotate anything new, push back the build template if a "
+                        "pipeline drifted."
+                    ),
+                    "recurrence_unit": "weeks",
+                    "recurrence_interval": 1,
+                    # 2-day lead — fits the cadence (capped at half of 7
+                    # days) and gives the on-call engineer a Monday-prep
+                    # window for a Wednesday-due audit.
+                    "lead_time_days": 2,
+                    # Inside the 2-day window so the cycle is OPEN on a
+                    # fresh seed — showcases the live-work state with a
+                    # Todo on the admin's /todos list (in contrast to
+                    # the NIS2 / GDPR demos, which sit in `scheduled`).
+                    "due": today + timedelta(days=1),
+                },
+            ],
             "cards": ["app_jenkins", "app_github_actions"],
         },
         {
@@ -5909,6 +5931,28 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
                     # reminder a week before each quarterly tabletop.
                     "lead_time_days": 7,
                     "due": today + timedelta(days=30),
+                    # Backfill two historical cycles so the audit panel
+                    # has content from cycle one — shows the
+                    # owner-at-completion snapshot and populates the
+                    # admin's Done tab on /todos.
+                    "completed_cycles": [
+                        {
+                            "due_offset_days": -180,
+                            "completed_offset_days": -178,
+                            "notes": (
+                                "Two MFA-bypass scenarios; runbook updated; "
+                                "no incidents detected post-drill."
+                            ),
+                        },
+                        {
+                            "due_offset_days": -90,
+                            "completed_offset_days": -85,
+                            "notes": (
+                                "Vendor-side outage scenario; identified "
+                                "missing escalation path to OEM, ticketed."
+                            ),
+                        },
+                    ],
                 },
             ],
             "cards": ["app_nexascada", "app_opcenter"],
@@ -6055,7 +6099,11 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
                 ),
             )
             db.add(occurrence)
-        # Showcase recurring tasks on a couple of risks.
+        # Showcase recurring tasks on a couple of risks. Each recurring
+        # task can carry an optional ``completed_cycles`` list of
+        # historical done cycles so the demo's audit-trail panel and
+        # Done tab have realistic content from cycle one — not just an
+        # empty placeholder waiting on the user to complete something.
         recurring_tasks = r.get("recurring_tasks") or []
         for rt in recurring_tasks:
             task_seq += 1
@@ -6075,24 +6123,92 @@ async def _seed_demo_risks(db, admin_id, uuid_to_ref) -> int:
             )
             db.add(rtask)
             await db.flush()
-            # Mirror the lead-time gate that the service layer applies to
-            # freshly-created tasks: scheduled when today is outside the
-            # window, open otherwise. The seeded recurring tasks have
-            # due dates 30+ days out so they land as ``scheduled`` and
-            # showcase the "no Todo spam for control reviews months
-            # ahead" behaviour.
+
+            # Backfill historical cycles first so the active cycle gets
+            # the right sequence number (= len(completed) + 1).
+            completed_cycles = rt.get("completed_cycles") or []
+            for seq_offset, cc in enumerate(completed_cycles, start=1):
+                cc_due = today + timedelta(days=int(cc.get("due_offset_days", 0)))
+                cc_completed_at = now + timedelta(days=int(cc.get("completed_offset_days", 0)))
+                cc_id = __import__("uuid").uuid4()
+                db.add(
+                    RiskMitigationTaskOccurrence(
+                        id=cc_id,
+                        task_id=rtask.id,
+                        sequence=seq_offset,
+                        assigned_owner_id=r.get("owner"),
+                        due_date=cc_due,
+                        status="done",
+                        completed_at=cc_completed_at,
+                        completed_by=admin_id,
+                        owner_at_completion=r.get("owner"),
+                        completion_notes=cc.get("notes"),
+                    )
+                )
+                # Drop a matching system Todo marked done so the
+                # assignee's Done tab on /todos carries this cycle's
+                # closure record — same row the API path produces when
+                # the user marks a cycle done at runtime.
+                if r.get("owner"):
+                    db.add(
+                        Todo(
+                            id=__import__("uuid").uuid4(),
+                            card_id=None,
+                            description=f"[Risk R-{idx:06d}] {rt['title']}",
+                            status="done",
+                            link=(
+                                f"/ea-delivery/risks/{risk.id}?task={rtask.id}#occurrence-{cc_id}"
+                            ),
+                            is_system=True,
+                            assigned_to=r.get("owner"),
+                            created_by=admin_id,
+                            due_date=cc_due,
+                        )
+                    )
+
+            # Mirror the lead-time gate that the service layer applies
+            # to freshly-created tasks: scheduled when today is outside
+            # the window, open otherwise. Seeded recurring tasks span
+            # both states — see ``recurring_tasks`` entries in the demo
+            # list for the spread.
             rt_due = rt.get("due")
             within_window = rt_due is None or today >= rt_due - timedelta(days=rt_lead)
+            active_sequence = len(completed_cycles) + 1
+            active_status = "open" if within_window else "scheduled"
+            active_id = __import__("uuid").uuid4()
             db.add(
                 RiskMitigationTaskOccurrence(
-                    id=__import__("uuid").uuid4(),
+                    id=active_id,
                     task_id=rtask.id,
-                    sequence=1,
+                    sequence=active_sequence,
                     assigned_owner_id=r.get("owner"),
                     due_date=rt_due,
-                    status="open" if within_window else "scheduled",
+                    status=active_status,
+                    # Stamp activated_at on cycles that opened directly
+                    # so the audit trail can distinguish "always open"
+                    # from "promoted from scheduled". Demo opens are
+                    # the former — leave activated_at NULL.
                 )
             )
+            # The active cycle gets its system Todo iff it's open. A
+            # scheduled cycle deliberately owns no Todo (it's dormant
+            # until the daily promotion loop activates it).
+            if active_status == "open" and r.get("owner"):
+                db.add(
+                    Todo(
+                        id=__import__("uuid").uuid4(),
+                        card_id=None,
+                        description=f"[Risk R-{idx:06d}] {rt['title']}",
+                        status="open",
+                        link=(
+                            f"/ea-delivery/risks/{risk.id}?task={rtask.id}#occurrence-{active_id}"
+                        ),
+                        is_system=True,
+                        assigned_to=r.get("owner"),
+                        created_by=admin_id,
+                        due_date=rt_due,
+                    )
+                )
         count += 1
     await db.flush()
     return count
