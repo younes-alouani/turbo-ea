@@ -400,9 +400,17 @@ async def create_task_with_first_occurrence(
     lead_time_days = max(0, int(lead_time_days))
 
     today = datetime.now(timezone.utc).date()
-    initial_status = (
-        "open" if is_within_lead_window(due_date, lead_time_days, today) else "scheduled"
-    )
+    # Lead-time gating only applies to **recurring** tasks. A one-shot
+    # task is a discrete piece of work — sitting it in "scheduled" until
+    # the due date arrives would hide it from the assignee for weeks /
+    # months without purpose. Always open one-shots immediately so they
+    # behave like a regular dated Todo.
+    if recurrence_unit == "none":
+        initial_status = "open"
+    else:
+        initial_status = (
+            "open" if is_within_lead_window(due_date, lead_time_days, today) else "scheduled"
+        )
 
     reference = await next_task_reference(db)
     task = RiskMitigationTask(
