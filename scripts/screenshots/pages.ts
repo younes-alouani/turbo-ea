@@ -14,7 +14,7 @@
 
 export type ScreenshotAction =
   | { type: "scroll"; target: "bottom" | "top" | string; pixels?: number }
-  | { type: "click"; selector: string }
+  | { type: "click"; selector: string; nth?: number }
   | { type: "wait"; ms: number }
   | { type: "hover"; selector: string };
 
@@ -334,9 +334,24 @@ export const DOC_PAGES: PageDef[] = [
   {
     id: "10_report_portfolio",
     route: "/reports/portfolio",
-    waitFor: ".recharts-responsive-container",
-    // Recharts default grow-in animation is 1500 ms; wait past it.
-    actions: [{ type: "wait", ms: 1800 }],
+    waitFor: "[role='combobox']",
+    // Configure the two Select dropdowns: Group by → Organization,
+    // Color apps by → TIME Model. MUI Select menu items carry the option
+    // value on `data-value`, which lets us click them without depending on
+    // the translated label.
+    actions: [
+      { type: "wait", ms: 800 },
+      // Open Group by (first combobox in the toolbar)
+      { type: "click", selector: "[role='combobox']", nth: 0 },
+      { type: "wait", ms: 300 },
+      { type: "click", selector: "li[data-value='rel:Organization']" },
+      { type: "wait", ms: 300 },
+      // Open Color apps by (second combobox)
+      { type: "click", selector: "[role='combobox']", nth: 1 },
+      { type: "wait", ms: 300 },
+      { type: "click", selector: "li[data-value='timeModel']" },
+      { type: "wait", ms: 1800 },
+    ],
     filenames: {
       en: "10_report_portfolio",
       de: "10_bericht_portfolio",
@@ -1253,12 +1268,34 @@ export const DOC_PAGES: PageDef[] = [
     },
   },
 
-  // ── GRC — Compliance tab ─────────────────────────────────────────────────
-  // Deliberately not captured: the Compliance tab is gated behind an AI
-  // provider being configured. Without one (the default for the demo seed)
-  // the only thing visible is the "AI provider is not configured" empty
-  // state, which is misleading as documentation. Re-enable this entry once
-  // we have a way to capture the page with real findings present.
+  // ── GRC — Compliance register ───────────────────────────────────────────
+  // The Compliance tab is AI-gated, but the demo seed already ships six
+  // pre-existing findings + an AI provider configured at boot, so the
+  // register itself renders. We click the inner "Compliance" sub-tab to
+  // skip the KPI/overview pane and land on the actual register grid.
+  //
+  // `[role="tab"]` matches every Tab on the page; the inner Compliance tab
+  // sits at index 5 (3 GRC outer tabs + Overview + CVEs + Compliance).
+  {
+    id: "54_grc_compliance",
+    route: "/grc?tab=compliance",
+    waitFor: "[role='tab']",
+    actions: [
+      { type: "wait", ms: 1000 },
+      { type: "click", selector: "[role='tab']", nth: 5 },
+      { type: "wait", ms: 1500 },
+    ],
+    filenames: {
+      en: "54_grc_compliance",
+      de: "54_grc_compliance",
+      fr: "54_grc_conformite",
+      es: "54_grc_cumplimiento",
+      it: "54_grc_conformita",
+      pt: "54_grc_conformidade",
+      zh: "54_grc_compliance",
+      ru: "54_grc_sootvetstvie",
+    },
+  },
 
   // ── Initiative card — SoAW tab ───────────────────────────────────────────
   {

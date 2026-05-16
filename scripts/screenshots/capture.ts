@@ -309,11 +309,16 @@ async function executeActions(
 
       case "click":
         try {
-          // Try each comma-separated selector (fallback chain)
+          // Try each comma-separated selector (fallback chain). The optional
+          // `nth` field picks the Nth match of the *first* selector that
+          // resolves — useful when a page has multiple identical widgets
+          // (e.g. two MUI Select dropdowns).
           const selectors = action.selector.split(",").map((s) => s.trim());
           let clicked = false;
           for (const sel of selectors) {
-            const loc = page.locator(sel).first();
+            const base = page.locator(sel);
+            const loc =
+              typeof action.nth === "number" ? base.nth(action.nth) : base.first();
             if ((await loc.count()) > 0) {
               await loc.click({ timeout: 3000 });
               clicked = true;
