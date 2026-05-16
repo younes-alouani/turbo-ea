@@ -397,6 +397,13 @@ async function capturePage(
     await executeActions(page, pageDef.actions);
   }
 
+  // Baseline settling wait — guarantees at least 2s between the page reaching
+  // its final state and the screenshot capture, so loading spinners, MUI
+  // ripples, chart animations, AG Grid row entry transitions, and lazy-loaded
+  // images all settle even when a page's `actions` list doesn't include an
+  // explicit `wait`. Per-page `actions` may add additional waits on top.
+  await page.waitForTimeout(2000);
+
   // Determine filename
   const filename = (pageDef.filenames[locale] || pageDef.id) + ".png";
   const fullPath = path.join(outputPath, filename);
