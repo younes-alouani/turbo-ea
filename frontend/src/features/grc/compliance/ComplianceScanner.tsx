@@ -51,7 +51,8 @@ import {
   RiskDialogSeed,
   seedFromCompliance,
 } from "@/features/grc/risk/riskDefaults";
-import { useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { useAuthContext } from "@/hooks/AuthContext";
 import ComplianceScanCard from "./ComplianceScanCard";
 import { useAnalysisPolling } from "./useAnalysisPolling";
 
@@ -148,6 +149,7 @@ export default function ComplianceScanner() {
   const { t } = useTranslation("admin");
   const { t: tCards } = useTranslation("cards");
   const navigate = useNavigate();
+  const { user } = useAuthContext();
   const phaseLabel = useCallback(
     (phase: string) => {
       const key = `turbolens_security_phase_${phase}`;
@@ -692,7 +694,21 @@ export default function ComplianceScanner() {
             )}
           </ComplianceScanCard>
         ) : (
-          <Alert severity="info">
+          <Alert
+            severity="info"
+            action={
+              user?.permissions?.["*"] || user?.permissions?.["admin.settings"] ? (
+                <Button
+                  size="small"
+                  component={RouterLink}
+                  to="/admin/settings?tab=ai"
+                  color="inherit"
+                >
+                  {t("compliance.aiRequired.configureCta")}
+                </Button>
+              ) : null
+            }
+          >
             {t("turbolens_security_ai_not_configured_register_still_available")}
           </Alert>
         )}
