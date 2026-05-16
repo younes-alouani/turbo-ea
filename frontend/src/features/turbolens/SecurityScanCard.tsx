@@ -1,9 +1,6 @@
 /**
  * SecurityScanCard — one-scan status card with progress bar, trigger button
  * and optional per-scan settings (e.g. regulation checkboxes for compliance).
- *
- * Used twice on the Security Overview: once for the CVE scan, once for the
- * compliance scan.
  */
 import { ReactNode } from "react";
 import { useTranslation } from "react-i18next";

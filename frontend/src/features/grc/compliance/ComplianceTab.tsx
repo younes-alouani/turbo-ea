@@ -22,11 +22,6 @@ const TurboLensSecurity = lazy(() => import("@/features/turbolens/TurboLensSecur
  * "AI is not configured" placeholders, and the tab UI is misleading — so when
  * AI isn't configured we surface a clear gate instead of the scanner. Admins
  * get a deep link to the AI settings; non-admins are told who to ask.
- *
- * CVE scanning also lives behind this gate. While CVE lookups themselves don't
- * require AI, the LLM-driven prioritisation is a core part of the value; running
- * a CVE scan against a flat list of NVD records without it is rarely worth the
- * time on installs that haven't set AI up yet.
  */
 export default function ComplianceTab() {
   const { t } = useTranslation("grc");
