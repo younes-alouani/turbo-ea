@@ -166,7 +166,7 @@ export default function CreateComplianceFindingDialog({
               {enabledRegulations.map((r) => (
                 <MenuItem key={r.key} value={r.key}>
                   {r.label ||
-                    t(`turbolens_security_regulation_${r.key}`, {
+                    t(`compliance_regulation_${r.key}`, {
                       defaultValue: r.key,
                     })}
                 </MenuItem>
@@ -215,28 +215,28 @@ export default function CreateComplianceFindingDialog({
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <FormControl size="small" fullWidth>
               <InputLabel>
-                {t("turbolens_security_compliance_filter_status")}
+                {t("compliance_filter_status")}
               </InputLabel>
               <Select
                 value={status}
-                label={t("turbolens_security_compliance_filter_status")}
+                label={t("compliance_filter_status")}
                 onChange={(e) => setStatus(e.target.value as ComplianceStatus)}
                 disabled={submitting}
               >
                 {STATUSES.map((s) => (
                   <MenuItem key={s} value={s}>
-                    {t(`turbolens_security_compliance_status_${s}`)}
+                    {t(`compliance_status_${s}`)}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
             <FormControl size="small" fullWidth>
               <InputLabel>
-                {t("turbolens_security_compliance_filter_severity")}
+                {t("compliance_filter_severity")}
               </InputLabel>
               <Select
                 value={severity}
-                label={t("turbolens_security_compliance_filter_severity")}
+                label={t("compliance_filter_severity")}
                 onChange={(e) =>
                   setSeverity(
                     e.target.value as TurboLensComplianceFinding["severity"],
@@ -246,7 +246,7 @@ export default function CreateComplianceFindingDialog({
               >
                 {SEVERITIES.map((s) => (
                   <MenuItem key={s} value={s}>
-                    {t(`turbolens_security_severity_${s}`)}
+                    {t(`compliance_severity_${s}`)}
                   </MenuItem>
                 ))}
               </Select>

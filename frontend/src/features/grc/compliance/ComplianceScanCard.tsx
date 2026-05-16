@@ -133,12 +133,12 @@ export default function ComplianceScanCard({
           {run?.completed_at ? (
             <>
               <Typography variant="caption" color="text.secondary">
-                {t("turbolens_security_last_scan")}: {formatTimestamp(run.completed_at)}
+                {t("compliance_last_scan")}: {formatTimestamp(run.completed_at)}
               </Typography>
               {run.status === "failed" && run.error && (
                 <Tooltip title={run.error}>
                   <Typography variant="caption" color="error.main">
-                    {t("turbolens_security_scan_failed")}
+                    {t("compliance_scan_failed")}
                   </Typography>
                 </Tooltip>
               )}
