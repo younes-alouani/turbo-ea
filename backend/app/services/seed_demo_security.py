@@ -358,7 +358,7 @@ async def seed_security_demo_data(db: AsyncSession) -> dict:
 
     compliance_run = TurboLensAnalysisRun(
         id=uuid.uuid4(),
-        analysis_type="security_compliance",
+        analysis_type="compliance",
         status="completed",
         started_at=now,
         completed_at=now,

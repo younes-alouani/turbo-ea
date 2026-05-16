@@ -3,7 +3,7 @@
 PATCH /security/compliance-findings/bulk — bulk decision update.
 DELETE /security/compliance-findings/bulk — bulk delete.
 
-Both endpoints share the gate (``security_compliance.manage``, admin
+Both endpoints share the gate (``compliance.manage``, admin
 role by default) and the per-row partial-success contract: invalid /
 not-found / risk-tracked rows go into ``skipped`` instead of failing
 the whole batch.
@@ -34,7 +34,7 @@ async def env(db):
 
     run = TurboLensAnalysisRun(
         id=uuid.uuid4(),
-        analysis_type="security_compliance",
+        analysis_type="compliance",
         status="completed",
         started_at=datetime.now(timezone.utc),
         created_by=admin.id,

@@ -73,10 +73,10 @@ class AnalysisType(str, enum.Enum):
     MODERNIZATION = "modernization"
     ARCHITECT = "architect"
     ARCHITECT_COMMIT = "architect_commit"
-    SECURITY_COMPLIANCE = "security_compliance"
+    COMPLIANCE = "compliance"
 
 
-SECURITY_SCAN_TYPES = (AnalysisType.SECURITY_COMPLIANCE,)
+COMPLIANCE_SCAN_TYPES = (AnalysisType.COMPLIANCE,)
 
 
 class AnalysisStatus(str, enum.Enum):
@@ -151,6 +151,16 @@ router = APIRouter(prefix="/turbolens", tags=["TurboLens"])
 # Mounted by api/v1/router.py alongside the main `router`. Kept here so the
 # compliance code lives in one file but exposed at the URL users expect.
 cards_router = APIRouter(prefix="/cards", tags=["TurboLens"])
+
+# Compliance scanner sibling router. The compliance scanner conceptually
+# moved out of TurboLens when the CVE half of the old "Security &
+# Compliance" tab was removed — it's now a GRC concern, not an AI-
+# intelligence one. Routes are physically defined further down in this
+# file (they share _run_analysis / _create_analysis_run / _load_card_meta
+# / AnalysisType helpers with the rest of the TurboLens AI scaffolding)
+# but mounted at /compliance/* via this dedicated router so URL paths,
+# OpenAPI tags, and permission keys are clean.
+compliance_router = APIRouter(prefix="/compliance", tags=["Compliance"])
 
 
 # ── Status & Overview ──────────────────────────────────────────────────────
@@ -901,7 +911,7 @@ async def _load_card_meta(
     return out
 
 
-@router.post("/security/compliance-scan")
+@compliance_router.post("/compliance-scan")
 async def trigger_compliance_scan(
     body: SecurityScanRequest | None,
     background_tasks: BackgroundTasks,
@@ -909,9 +919,9 @@ async def trigger_compliance_scan(
     user: User = Depends(get_current_user),
 ):
     """Trigger the compliance (per-regulation AI gap analysis) pipeline only."""
-    await PermissionService.require_permission(db, user, "security_compliance.manage")
+    await PermissionService.require_permission(db, user, "compliance.manage")
 
-    run = await _create_analysis_run(db, AnalysisType.SECURITY_COMPLIANCE, user)
+    run = await _create_analysis_run(db, AnalysisType.COMPLIANCE, user)
     # When the client doesn't filter, the service loads every enabled
     # regulation from the DB. We pass the filter through verbatim and let
     # the service intersect with the enabled set.
@@ -927,7 +937,7 @@ async def trigger_compliance_scan(
     return {"run_id": str(run.id), "status": "running"}
 
 
-@router.get("/security/active-runs")
+@compliance_router.get("/active-runs")
 async def security_active_runs(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -938,13 +948,13 @@ async def security_active_runs(
     after a page refresh. ``compliance`` is ``null`` when no scan is
     currently running.
     """
-    await PermissionService.require_permission(db, user, "security_compliance.view")
+    await PermissionService.require_permission(db, user, "compliance.view")
 
     out: dict[str, TurboLensAnalysisRunOut | None] = {"compliance": None}
     result = await db.execute(
         select(TurboLensAnalysisRun)
         .where(
-            TurboLensAnalysisRun.analysis_type == AnalysisType.SECURITY_COMPLIANCE,
+            TurboLensAnalysisRun.analysis_type == AnalysisType.COMPLIANCE,
             TurboLensAnalysisRun.status == AnalysisStatus.RUNNING,
         )
         .order_by(TurboLensAnalysisRun.started_at.desc())
@@ -956,13 +966,13 @@ async def security_active_runs(
     return out
 
 
-@router.get("/security/overview")
+@compliance_router.get("/overview")
 async def security_overview(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> SecurityOverviewOut:
     """KPIs for the compliance scanner dashboard."""
-    await PermissionService.require_permission(db, user, "security_compliance.view")
+    await PermissionService.require_permission(db, user, "compliance.view")
 
     from app.schemas.turbolens import SecurityScanRunOut
     from app.services.compliance_scanner import compliance_score
@@ -996,7 +1006,7 @@ async def security_overview(
             summary=summary,
         )
 
-    compliance_run = await _latest(AnalysisType.SECURITY_COMPLIANCE)
+    compliance_run = await _latest(AnalysisType.COMPLIANCE)
 
     compliance_res = await db.execute(select(TurboLensComplianceFinding))
     compliance_rows = list(compliance_res.scalars().all())
@@ -1020,7 +1030,7 @@ async def security_overview(
     )
 
 
-@router.get("/security/compliance")
+@compliance_router.get("/compliance")
 async def list_compliance(
     regulation: str | None = None,
     status: str | None = None,
@@ -1036,7 +1046,7 @@ async def list_compliance(
     audit-trail view). Mirrors the default on
     ``GET /cards/{id}/compliance-findings``.
     """
-    await PermissionService.require_permission(db, user, "security_compliance.view")
+    await PermissionService.require_permission(db, user, "compliance.view")
 
     from app.services.compliance_scanner import (
         compliance_score,
@@ -1128,7 +1138,7 @@ _VALID_COMPLIANCE_STATUSES: frozenset[str] = frozenset(
 _VALID_SEVERITIES: frozenset[str] = frozenset({"critical", "high", "medium", "low", "info"})
 
 
-@router.post("/security/compliance-findings", response_model=ComplianceFindingOut)
+@compliance_router.post("/compliance-findings", response_model=ComplianceFindingOut)
 async def create_compliance_finding_manual(
     body: ComplianceFindingCreate,
     db: AsyncSession = Depends(get_db),
@@ -1140,9 +1150,9 @@ async def create_compliance_finding_manual(
     satisfy the FK (``run_id`` is non-null), computes ``finding_key``
     via the same recipe as the scanner so a later re-scan can upsert
     cleanly, and persists the finding with ``decision='new'`` and
-    ``ai_detected=False``. Requires ``security_compliance.manage``.
+    ``ai_detected=False``. Requires ``compliance.manage``.
     """
-    await PermissionService.require_permission(db, user, "security_compliance.manage")
+    await PermissionService.require_permission(db, user, "compliance.manage")
 
     reg_key = (body.regulation or "").strip()
     if not reg_key:
@@ -1188,7 +1198,7 @@ async def create_compliance_finding_manual(
     # Synthetic run so the FK + audit trail stays sane.
     run = TurboLensAnalysisRun(
         id=uuid.uuid4(),
-        analysis_type=AnalysisType.SECURITY_COMPLIANCE,
+        analysis_type=AnalysisType.COMPLIANCE,
         status=AnalysisStatus.COMPLETED,
         started_at=datetime.now(timezone.utc),
         completed_at=datetime.now(timezone.utc),
@@ -1248,7 +1258,7 @@ async def create_compliance_finding_manual(
     )
 
 
-@router.patch("/security/compliance-findings/bulk")
+@compliance_router.patch("/compliance-findings/bulk")
 async def bulk_update_compliance_findings(
     body: ComplianceFindingBulkDecisionUpdate,
     db: AsyncSession = Depends(get_db),
@@ -1268,12 +1278,12 @@ async def bulk_update_compliance_findings(
     caller on every successful row, mirroring the per-row endpoint.
 
     NOTE: this route MUST be declared before the single-row
-    ``PATCH /security/compliance-findings/{finding_id}`` so FastAPI
+    ``PATCH /compliance/compliance-findings/{finding_id}`` so FastAPI
     matches the literal ``bulk`` segment first. Don't reorder.
     """
     from app.services.compliance_scanner import compliance_lifecycle_allowed
 
-    await PermissionService.require_permission(db, user, "security_compliance.manage")
+    await PermissionService.require_permission(db, user, "compliance.manage")
 
     decision = (body.decision or "").strip()
     if decision not in _USER_SETTABLE_COMPLIANCE_DECISIONS:
@@ -1326,7 +1336,7 @@ async def bulk_update_compliance_findings(
     return ComplianceFindingBulkResult(updated=updated, skipped=skipped)
 
 
-@router.patch("/security/compliance-findings/{finding_id}")
+@compliance_router.patch("/compliance-findings/{finding_id}")
 async def update_compliance_finding_decision(
     finding_id: str,
     body: ComplianceFindingDecisionUpdate,
@@ -1345,7 +1355,7 @@ async def update_compliance_finding_decision(
     """
     from app.services.compliance_scanner import compliance_lifecycle_allowed
 
-    await PermissionService.require_permission(db, user, "security_compliance.manage")
+    await PermissionService.require_permission(db, user, "compliance.manage")
     decision = (body.decision or "").strip()
     if decision not in _USER_SETTABLE_COMPLIANCE_DECISIONS:
         raise HTTPException(
@@ -1409,7 +1419,7 @@ async def update_compliance_finding_decision(
     )
 
 
-@router.delete("/security/compliance-findings/bulk")
+@compliance_router.delete("/compliance-findings/bulk")
 async def bulk_delete_compliance_findings(
     body: ComplianceFindingBulkDelete,
     db: AsyncSession = Depends(get_db),
@@ -1417,13 +1427,13 @@ async def bulk_delete_compliance_findings(
 ) -> ComplianceFindingBulkResult:
     """Bulk-delete compliance findings.
 
-    Same permission gate as the single-row delete (``security_compliance.manage``,
+    Same permission gate as the single-row delete (``compliance.manage``,
     granted to admin only by default). The linked Risk on any row is NOT
     cascaded — Risks are independent records once promoted. Missing ids
     are reported in ``skipped`` with ``reason="not_found"`` rather than
     failing the whole batch.
     """
-    await PermissionService.require_permission(db, user, "security_compliance.manage")
+    await PermissionService.require_permission(db, user, "compliance.manage")
 
     if not body.ids:
         return ComplianceFindingBulkResult(updated=0, skipped=[])
@@ -1455,7 +1465,7 @@ async def bulk_delete_compliance_findings(
     return ComplianceFindingBulkResult(updated=len(rows), skipped=skipped)
 
 
-@router.delete("/security/compliance-findings/{finding_id}", status_code=204)
+@compliance_router.delete("/compliance-findings/{finding_id}", status_code=204)
 async def delete_compliance_finding(
     finding_id: str,
     db: AsyncSession = Depends(get_db),
@@ -1463,14 +1473,14 @@ async def delete_compliance_finding(
 ):
     """Permanently delete a compliance finding.
 
-    Admin-grade action gated by ``security_compliance.manage`` (granted
+    Admin-grade action gated by ``compliance.manage`` (granted
     only to the admin role by default). The linked Risk (if any) is
     NOT cascaded — risks are independent records once promoted; the
     finding's row is simply removed. The next compliance scan will
     re-emit the finding if the LLM still reports it for the same
     card+regulation+article+requirement.
     """
-    await PermissionService.require_permission(db, user, "security_compliance.manage")
+    await PermissionService.require_permission(db, user, "compliance.manage")
     row = await db.get(TurboLensComplianceFinding, uuid.UUID(finding_id))
     if not row:
         raise HTTPException(404, "Finding not found")
@@ -1478,7 +1488,7 @@ async def delete_compliance_finding(
     await db.commit()
 
 
-@router.post("/security/compliance-findings/{finding_id}/ai-verdict")
+@compliance_router.post("/compliance-findings/{finding_id}/ai-verdict")
 async def submit_ai_verdict(
     finding_id: str,
     body: ComplianceFindingAiVerdict,
@@ -1492,7 +1502,7 @@ async def submit_ai_verdict(
     review note. The card must exist; landscape-scoped findings (no
     ``card_id``) cannot receive a verdict.
     """
-    await PermissionService.require_permission(db, user, "security_compliance.manage")
+    await PermissionService.require_permission(db, user, "compliance.manage")
 
     verdict = (body.verdict or "").strip()
     if verdict not in ("confirmed", "rejected"):
@@ -1586,7 +1596,7 @@ async def list_card_compliance_findings(
     Ordered by severity then regulation/article. Used by the Compliance
     tab on the Card Detail page (mirrors ``GET /cards/{id}/risks``).
     """
-    await PermissionService.require_permission(db, user, "security_compliance.view")
+    await PermissionService.require_permission(db, user, "compliance.view")
     try:
         card_uuid = uuid.UUID(card_id)
     except ValueError as exc:

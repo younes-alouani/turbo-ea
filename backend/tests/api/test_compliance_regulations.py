@@ -188,7 +188,7 @@ class TestComplianceRollupOrphans:
     async def _make_run_and_finding(self, db, regulation_key: str) -> None:
         run = TurboLensAnalysisRun(
             id=uuid.uuid4(),
-            analysis_type=AnalysisType.SECURITY_COMPLIANCE,
+            analysis_type=AnalysisType.COMPLIANCE,
             status=AnalysisStatus.COMPLETED,
         )
         db.add(run)
@@ -337,7 +337,7 @@ class TestRescanPreservesUserWork:
 
         scan_run = TurboLensAnalysisRun(
             id=uuid.uuid4(),
-            analysis_type=AnalysisType.SECURITY_COMPLIANCE,
+            analysis_type=AnalysisType.COMPLIANCE,
             status=AnalysisStatus.RUNNING,
         )
         db.add(scan_run)
@@ -360,7 +360,7 @@ class TestRescanPreservesUserWork:
         """Insert a finding with a fixed finding_key + lifecycle state."""
         prev_run = TurboLensAnalysisRun(
             id=uuid.uuid4(),
-            analysis_type=AnalysisType.SECURITY_COMPLIANCE,
+            analysis_type=AnalysisType.COMPLIANCE,
             status=AnalysisStatus.COMPLETED,
         )
         db.add(prev_run)
@@ -491,7 +491,7 @@ class TestRescanPreservesUserWork:
         # state the old code would have left it in).
         prev_run = TurboLensAnalysisRun(
             id=uuid.uuid4(),
-            analysis_type=AnalysisType.SECURITY_COMPLIANCE,
+            analysis_type=AnalysisType.COMPLIANCE,
             status=AnalysisStatus.COMPLETED,
         )
         db.add(prev_run)

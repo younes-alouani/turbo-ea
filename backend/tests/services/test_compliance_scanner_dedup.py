@@ -26,7 +26,7 @@ from tests.conftest import create_card
 async def _make_run(db) -> uuid.UUID:
     run = TurboLensAnalysisRun(
         id=uuid.uuid4(),
-        analysis_type="security_compliance",
+        analysis_type="compliance",
         status="running",
         started_at=datetime.now(timezone.utc),
         created_by=None,
