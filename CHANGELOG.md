@@ -5,6 +5,14 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.20.1] - 2026-05-17
+
+Bug fix for the Flexible Portfolio report introduced in 1.19.
+
+### Fixed
+- **Flexible Portfolio — saving a custom report**: `POST /saved-reports` was rejecting `report_type=flexible-portfolio` with HTTP 400 because the new type was missing from the backend whitelist. Saving now works the same as the Application Portfolio.
+- **Flexible Portfolio — losing selections on navigation**: the auto-persist effect on every Portfolio-style report (Application + Flexible) was firing once on mount with the initial defaults — overwriting the user's saved localStorage config in the brief window before the restore effect's state updates flushed. Skip the first run so the saved config is preserved on return.
+
 ## [1.20.0] - 2026-05-17
 
 Workspace dashboard and Todos page improvements. Surfaces saved reports inline on the Workspace tab, restructures the Todos page into symmetric "Assigned to me" / "Created by me" scopes, and aligns the workspace counters with the lists rendered under them.

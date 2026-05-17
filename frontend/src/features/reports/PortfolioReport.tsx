@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { alpha, useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
@@ -598,8 +598,16 @@ export default function PortfolioReport({
 
   const getConfig = () => ({ cardType, view, groupByRaw, colorBy, search, attrFilters, relationFilters, tagFilterIds, timelineDate: tl.persistValue, sortK, sortD });
 
-  // Auto-persist config to localStorage
+  // Auto-persist config to localStorage. Skip the very first run so that on
+  // mount we don't overwrite a previously-saved config with the initial
+  // defaults (the consume-config effect runs alongside this one but its state
+  // updates have not yet flushed when this closure is first invoked).
+  const skipFirstPersistRef = useRef(true);
   useEffect(() => {
+    if (skipFirstPersistRef.current) {
+      skipFirstPersistRef.current = false;
+      return;
+    }
     saved.persistConfig(getConfig());
   }, [cardType, view, groupByRaw, colorBy, search, attrFilters, relationFilters, tagFilterIds, tl.timelineDate, sortK, sortD]); // eslint-disable-line react-hooks/exhaustive-deps
 
