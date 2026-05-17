@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -247,19 +247,19 @@ async def my_workspace_summary(
         )
     ).scalar() or 0
 
-    # A card is "yours" when you either created it or hold any stakeholder
-    # role on it — both make you accountable for keeping its approval state
-    # current, which is what this counter is supposed to surface.
-    stakeholder_cards_sq = select(Stakeholder.card_id).where(Stakeholder.user_id == user.id)
+    # "Cards I'm responsible for" means cards I hold a stakeholder role
+    # on — same notion of ownership the todos counter uses (assigned to
+    # me). Cards I only created but have no role on are intentionally
+    # excluded; assign yourself as a stakeholder if you want them to
+    # appear here.
     broken_card_count = (
         await db.execute(
-            select(func.count(Card.id)).where(
+            select(func.count(func.distinct(Card.id)))
+            .join(Stakeholder, Stakeholder.card_id == Card.id)
+            .where(
+                Stakeholder.user_id == user.id,
                 Card.status == "ACTIVE",
                 Card.approval_status == "BROKEN",
-                or_(
-                    Card.created_by == user.id,
-                    Card.id.in_(stakeholder_cards_sq),
-                ),
             )
         )
     ).scalar() or 0

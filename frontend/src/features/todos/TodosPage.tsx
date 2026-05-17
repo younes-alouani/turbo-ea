@@ -12,6 +12,8 @@ import IconButton from "@mui/material/IconButton";
 import Chip from "@mui/material/Chip";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import Badge from "@mui/material/Badge";
 import Alert from "@mui/material/Alert";
@@ -41,12 +43,15 @@ function isOverdue(todo: Todo): boolean {
 
 /* ── Todos sub-panel ─────────────────────────────────────────────────── */
 
+type CreatedStatusFilter = "open" | "done" | "all";
+
 function TodosPanel() {
   const { t } = useTranslation("common");
   const navigate = useNavigate();
   const { formatDate } = useDateFormat();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [tab, setTab] = useState(0);
+  const [createdStatus, setCreatedStatus] = useState<CreatedStatusFilter>("open");
 
   useEffect(() => {
     // Tab order: Open · Done · All (all 3 scoped to "assigned to me") · Created by me
@@ -54,9 +59,12 @@ function TodosPanel() {
     if (tab === 0) params = "?status=open&assigned_only=true";
     else if (tab === 1) params = "?status=done&assigned_only=true";
     else if (tab === 2) params = "?assigned_only=true";
-    else if (tab === 3) params = "?created_only=true";
+    else if (tab === 3) {
+      params = "?created_only=true";
+      if (createdStatus !== "all") params += `&status=${createdStatus}`;
+    }
     api.get<Todo[]>(`/todos${params}`).then(setTodos);
-  }, [tab]);
+  }, [tab, createdStatus]);
 
   const sortedTodos = useMemo(() => [...todos].sort(compareByDueDateAsc), [todos]);
   const showAssignee = tab === 3;
@@ -87,6 +95,21 @@ function TodosPanel() {
         <Tab label={t("todos.tabs.all")} />
         <Tab label={t("todos.tabs.createdByMe")} />
       </Tabs>
+
+      {tab === 3 && (
+        <Box sx={{ mb: 2 }}>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={createdStatus}
+            onChange={(_, v: CreatedStatusFilter | null) => v && setCreatedStatus(v)}
+          >
+            <ToggleButton value="open">{t("todos.tabs.open")}</ToggleButton>
+            <ToggleButton value="done">{t("todos.tabs.done")}</ToggleButton>
+            <ToggleButton value="all">{t("todos.tabs.all")}</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      )}
 
       <List>
         {sortedTodos.map((todo) => (
