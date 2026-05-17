@@ -192,7 +192,7 @@ describe("PortfolioReport", () => {
     renderPortfolio();
 
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith("/reports/app-portfolio");
+      expect(api.get).toHaveBeenCalledWith("/reports/app-portfolio?type=Application");
     });
   });
 

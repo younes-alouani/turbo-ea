@@ -3,6 +3,7 @@
   "inventory": "Инвентарь",
   "reports": "Отчёты",
   "reports.portfolio": "Портфолио",
+  "reports.flexiblePortfolio": "Гибкое портфолио",
   "reports.capabilityMap": "Карта возможностей",
   "reports.lifecycle": "Жизненный цикл",
   "reports.dependencies": "Зависимости",

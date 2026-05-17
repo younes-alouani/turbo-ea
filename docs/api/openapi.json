@@ -21367,8 +21367,20 @@
     },
     "/api/v1/reports/app-portfolio": {
       "get": {
-        "description": "Application portfolio report: all applications with relations for\nflexible client-side grouping by any attribute or related card type.",
+        "description": "Portfolio report: all cards of the requested type with their relations\nfor flexible client-side grouping by any attribute or related card type.\n\nDefaults to ``type=Application`` so the original Application Portfolio\nreport keeps working without changes. The Flexible Portfolio report passes\nother card type keys (BusinessCapability, Initiative, ITComponent, ...).",
         "operationId": "app_portfolio_api_v1_reports_app_portfolio_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "default": "Application",
+              "title": "Type",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -21377,6 +21389,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "App Portfolio",

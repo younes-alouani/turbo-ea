@@ -275,3 +275,102 @@ class TestAppPortfolio:
             headers=auth_headers(portfolio_env["viewer"]),
         )
         assert resp.status_code == 403
+
+
+class TestAppPortfolioTypeParam:
+    """The ?type= query param powers the Flexible Portfolio report.
+
+    Defaults to Application for backwards compatibility; any other visible
+    card type is accepted; hidden or unknown types return 404.
+    """
+
+    async def test_default_type_is_application(self, client, db, portfolio_env):
+        admin = portfolio_env["admin"]
+        await create_card(db, card_type="Application", name="CRM", user_id=admin.id)
+        await create_card(db, card_type="BusinessCapability", name="Sales", user_id=admin.id)
+
+        resp = await client.get(
+            "/api/v1/reports/app-portfolio",
+            headers=auth_headers(admin),
+        )
+        assert resp.status_code == 200
+        names = {item["name"] for item in resp.json()["items"]}
+        assert names == {"CRM"}
+
+    async def test_explicit_type_returns_matching_cards(self, client, db, portfolio_env):
+        admin = portfolio_env["admin"]
+        await create_card(db, card_type="Application", name="CRM", user_id=admin.id)
+        await create_card(db, card_type="BusinessCapability", name="Sales", user_id=admin.id)
+        await create_card(db, card_type="BusinessCapability", name="Marketing", user_id=admin.id)
+
+        resp = await client.get(
+            "/api/v1/reports/app-portfolio?type=BusinessCapability",
+            headers=auth_headers(admin),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        names = {item["name"] for item in data["items"]}
+        assert names == {"Sales", "Marketing"}
+
+    async def test_explicit_type_returns_correct_fields_schema(self, client, db, portfolio_env):
+        """Fields schema must come from the requested type, not Application."""
+        admin = portfolio_env["admin"]
+        await create_card_type(
+            db,
+            key="Initiative",
+            label="Initiative",
+            fields_schema=[
+                {
+                    "section": "General",
+                    "fields": [
+                        {
+                            "key": "initiativeStatus",
+                            "label": "Status",
+                            "type": "single_select",
+                            "weight": 1,
+                        }
+                    ],
+                }
+            ],
+        )
+
+        resp = await client.get(
+            "/api/v1/reports/app-portfolio?type=Initiative",
+            headers=auth_headers(admin),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        field_keys = {
+            f["key"] for section in data["fields_schema"] for f in section.get("fields", [])
+        }
+        assert field_keys == {"initiativeStatus"}
+
+    async def test_unknown_type_returns_404(self, client, portfolio_env):
+        resp = await client.get(
+            "/api/v1/reports/app-portfolio?type=NotARealType",
+            headers=auth_headers(portfolio_env["admin"]),
+        )
+        assert resp.status_code == 404
+
+    async def test_hidden_type_returns_404(self, client, db, portfolio_env):
+        await create_card_type(db, key="HiddenKind", label="Hidden", is_hidden=True)
+        resp = await client.get(
+            "/api/v1/reports/app-portfolio?type=HiddenKind",
+            headers=auth_headers(portfolio_env["admin"]),
+        )
+        assert resp.status_code == 404
+
+    async def test_relation_types_filtered_by_requested_type(self, client, db, portfolio_env):
+        """relation_types should list types reachable from the requested type."""
+        admin = portfolio_env["admin"]
+        # app_to_cap (Application → BusinessCapability) should appear when
+        # type=BusinessCapability is requested, with Application as "other".
+        await create_card(db, card_type="BusinessCapability", name="Sales", user_id=admin.id)
+
+        resp = await client.get(
+            "/api/v1/reports/app-portfolio?type=BusinessCapability",
+            headers=auth_headers(admin),
+        )
+        data = resp.json()
+        other_types = {rt["other_type_key"] for rt in data["relation_types"]}
+        assert "Application" in other_types

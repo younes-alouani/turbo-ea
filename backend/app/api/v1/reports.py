@@ -765,22 +765,33 @@ async def portfolio(
 
 @router.get("/app-portfolio")
 async def app_portfolio(
+    type: str = Query("Application"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Application portfolio report: all applications with relations for
-    flexible client-side grouping by any attribute or related card type."""
+    """Portfolio report: all cards of the requested type with their relations
+    for flexible client-side grouping by any attribute or related card type.
+
+    Defaults to ``type=Application`` so the original Application Portfolio
+    report keeps working without changes. The Flexible Portfolio report passes
+    other card type keys (BusinessCapability, Initiative, ITComponent, ...).
+    """
     await PermissionService.require_permission(db, user, "reports.portfolio")
 
-    # 1. Get all active applications
-    apps_result = await db.execute(
-        select(Card).where(Card.type == "Application", Card.status == "ACTIVE")
-    )
+    # 0. Validate the requested card type exists and is visible.
+    all_types_result = await db.execute(select(CardType))
+    all_types = all_types_result.scalars().all()
+    target_type = next((t for t in all_types if t.key == type), None)
+    if target_type is None or target_type.is_hidden:
+        raise HTTPException(status_code=404, detail=f"Card type '{type}' not found")
+
+    # 1. Get all active cards of the requested type
+    apps_result = await db.execute(select(Card).where(Card.type == type, Card.status == "ACTIVE"))
     apps = apps_result.scalars().all()
     app_ids = [a.id for a in apps]
     app_id_set = {str(a.id) for a in apps}
 
-    # 2. Get all relations touching applications
+    # 2. Get all relations touching those cards
     rels_result = await db.execute(
         select(Relation).where(
             (Relation.source_id.in_(app_ids)) | (Relation.target_id.in_(app_ids))
@@ -814,7 +825,7 @@ async def app_portfolio(
                 "type": card.type,
             }
 
-    # 4. Build app -> relations lookup
+    # 4. Build card -> relations lookup
     app_relations: dict[str, list[dict]] = {str(a.id): [] for a in apps}
     for r in rels:
         sid, tid = str(r.source_id), str(r.target_id)
@@ -844,9 +855,9 @@ async def app_portfolio(
     seen_other_types: set[str] = set()
     for rt in relation_types_list:
         other = None
-        if rt.source_type_key == "Application":
+        if rt.source_type_key == type:
             other = rt.target_type_key
-        elif rt.target_type_key == "Application":
+        elif rt.target_type_key == type:
             other = rt.source_type_key
         if other and other not in seen_other_types:
             seen_other_types.add(other)
@@ -863,13 +874,10 @@ async def app_portfolio(
             )
 
     # 6. Get card types (schema + visibility)
-    all_types_result = await db.execute(select(CardType))
-    all_types = all_types_result.scalars().all()
     visible_type_keys = {t.key for t in all_types if not t.is_hidden}
-    app_type = next((t for t in all_types if t.key == "Application"), None)
-    fields_schema = app_type.fields_schema if app_type else []
+    fields_schema = target_type.fields_schema if target_type else []
 
-    # 7. Get all organizations for org filter options
+    # 7. Get all organizations for org filter options (backwards-compat)
     orgs_result = await db.execute(
         select(Card).where(Card.type == "Organization", Card.status == "ACTIVE").order_by(Card.name)
     )
@@ -885,7 +893,7 @@ async def app_portfolio(
         elif tid in org_ids and sid in app_id_set:
             app_orgs.setdefault(sid, set()).add(tid)
 
-    # Tag assignments + tag groups applicable to Application
+    # Tag assignments + tag groups applicable to the requested card type
     app_tag_ids: dict[str, list[str]] = {}
     if app_ids:
         ct_rows = await db.execute(select(CardTag).where(CardTag.card_id.in_(app_ids)))
@@ -895,7 +903,7 @@ async def app_portfolio(
     tg_rows = await db.execute(select(TagGroup).order_by(TagGroup.name))
     tag_groups_payload = []
     for tg in tg_rows.scalars().all():
-        if tg.restrict_to_types and "Application" not in tg.restrict_to_types:
+        if tg.restrict_to_types and type not in tg.restrict_to_types:
             continue
         t_rows = await db.execute(select(Tag).where(Tag.tag_group_id == tg.id).order_by(Tag.name))
         tag_groups_payload.append(

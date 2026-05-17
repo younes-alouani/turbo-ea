@@ -374,12 +374,14 @@ function GroupCard({
   selectFields,
   onGroupClick,
   onAppClick,
+  countLabel,
 }: {
   group: GroupData;
   colorBy: string;
   selectFields: FieldDef[];
   onGroupClick: (g: GroupData) => void;
   onAppClick: (id: string) => void;
+  countLabel: (count: number) => string;
 }) {
   const { t } = useTranslation(["reports"]);
   const count = group.apps.length;
@@ -442,7 +444,7 @@ function GroupCard({
         </Typography>
         <Chip
           size="small"
-          label={t("portfolio.apps", { count })}
+          label={countLabel(count)}
           sx={{
             height: 22,
             fontSize: "0.72rem",
@@ -502,16 +504,37 @@ function GroupCard({
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
-export default function PortfolioReport() {
+interface PortfolioReportProps {
+  /** Card type key to load. Defaults to "Application" for the legacy
+   * Application Portfolio route. */
+  initialCardType?: string;
+  /** When true, render a card-type picker in the toolbar so the user can
+   * switch between any visible card type — used by the Flexible Portfolio. */
+  showTypeSelector?: boolean;
+  /** Distinct key for saved-report persistence so the Application Portfolio
+   * and Flexible Portfolio keep independent localStorage state. */
+  savedReportKey?: string;
+  /** Title override (defaults to the resolved card type label, then to the
+   * generic Application Portfolio title for backwards compatibility). */
+  titleOverride?: string;
+}
+
+export default function PortfolioReport({
+  initialCardType = "Application",
+  showTypeSelector = false,
+  savedReportKey = "portfolio",
+  titleOverride,
+}: PortfolioReportProps = {}) {
   const { t } = useTranslation(["reports", "common"]);
   const theme = useTheme();
   const { types: metamodelTypes } = useMetamodel();
   const rl = useResolveLabel();
   const rml = useResolveMetaLabel();
-  const saved = useSavedReport("portfolio");
+  const saved = useSavedReport(savedReportKey);
   const { chartRef, thumbnail, captureAndSave } = useThumbnailCapture(() => saved.setSaveDialogOpen(true));
 
   // Data
+  const [cardType, setCardType] = useState<string>(initialCardType);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [drawer, setDrawer] = useState<DrawerData | null>(null);
   const [sidePanelCardId, setSidePanelCardId] = useState<string | null>(null);
@@ -548,6 +571,7 @@ export default function PortfolioReport() {
     const cfg = saved.consumeConfig();
     tl.restore(cfg?.timelineDate as number | undefined);
     if (cfg) {
+      if (showTypeSelector && cfg.cardType) setCardType(cfg.cardType as string);
       if (cfg.view) setView(cfg.view as "chart" | "table");
       if (cfg.groupByRaw) setGroupByRaw(cfg.groupByRaw as string);
       if (cfg.colorBy != null) setColorBy(cfg.colorBy as string);
@@ -572,16 +596,17 @@ export default function PortfolioReport() {
     }
   }, [saved.loadedConfig]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const getConfig = () => ({ view, groupByRaw, colorBy, search, attrFilters, relationFilters, tagFilterIds, timelineDate: tl.persistValue, sortK, sortD });
+  const getConfig = () => ({ cardType, view, groupByRaw, colorBy, search, attrFilters, relationFilters, tagFilterIds, timelineDate: tl.persistValue, sortK, sortD });
 
   // Auto-persist config to localStorage
   useEffect(() => {
     saved.persistConfig(getConfig());
-  }, [view, groupByRaw, colorBy, search, attrFilters, relationFilters, tagFilterIds, tl.timelineDate, sortK, sortD]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cardType, view, groupByRaw, colorBy, search, attrFilters, relationFilters, tagFilterIds, tl.timelineDate, sortK, sortD]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset all parameters to defaults
   const handleReset = useCallback(() => {
     saved.resetAll();
+    setCardType(initialCardType);
     setView("chart");
     setGroupByRaw("");
     setColorBy("");
@@ -594,12 +619,32 @@ export default function PortfolioReport() {
     setSortK("name");
     setSortD("asc");
     setDefaultsApplied(false);
-  }, [saved]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [saved, initialCardType]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch data
+  // Fetch data — refetches whenever the user picks a different card type.
   useEffect(() => {
-    api.get<ApiResponse>("/reports/app-portfolio").then((r) => setData(r));
-  }, []);
+    setData(null);
+    setAiInsights(null);
+    setAiOpen(false);
+    api
+      .get<ApiResponse>(`/reports/app-portfolio?type=${encodeURIComponent(cardType)}`)
+      .then((r) => setData(r));
+  }, [cardType]);
+
+  // Switching card types invalidates field/relation/tag selections because
+  // the keys they reference don't exist on the new type. Clear them so the
+  // "Apply defaults once data is available" effect re-picks valid values.
+  const handleCardTypeChange = useCallback((nextType: string) => {
+    if (nextType === cardType) return;
+    setCardType(nextType);
+    setGroupByRaw("");
+    setColorBy("");
+    setAttrFilters({});
+    setRelationFilters({});
+    setTagFilterIds([]);
+    setShowAllRelFilters(false);
+    setDefaultsApplied(false);
+  }, [cardType]);
 
   // Derived data — resolve field & option labels for the current locale
   const selectFields = useMemo(() => {
@@ -926,6 +971,48 @@ export default function PortfolioReport() {
   const colorByLabel = colorByOptions.find((o) => o.key === colorBy)?.label || "";
   const activeFilterCount = Object.values(attrFilters).flat().length + Object.values(relationFilters).flat().length + tagFilterIds.length;
 
+  // Visible card types — populates the optional type selector and resolves
+  // the localised label of the currently-selected type for dynamic strings.
+  const cardTypeOptions = useMemo(() => {
+    return metamodelTypes
+      .filter((tp) => !tp.is_hidden)
+      .map((tp) => ({
+        key: tp.key,
+        label: rml(tp.key, tp.translations, "label") || tp.label || tp.key,
+        icon: tp.icon || "category",
+        color: tp.color,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [metamodelTypes, rml]);
+  const currentType = metamodelTypes.find((tp) => tp.key === cardType);
+  const typeLabel =
+    rml(cardType, currentType?.translations, "label") ||
+    currentType?.label ||
+    cardType;
+  const typeIcon = currentType?.icon || "dashboard";
+  const typeColor = currentType?.color || "#0f7eb5";
+
+  // Title falls back to the legacy hardcoded "Application Portfolio" string
+  // when the type is Application so existing screenshots/tests stay valid.
+  const resolvedTitle = titleOverride
+    ? titleOverride
+    : showTypeSelector
+      ? t("flexiblePortfolio.titleFor", { type: typeLabel })
+      : cardType === "Application"
+        ? t("portfolio.title")
+        : t("flexiblePortfolio.titleFor", { type: typeLabel });
+
+  // Group/ungrouped count chip — "{n} apps" for the legacy Application
+  // Portfolio (preserves wording); "{n} {typeLabel}" once the user picks
+  // a different type so the pill matches the cards on screen.
+  const countLabel = useCallback(
+    (n: number) =>
+      cardType === "Application"
+        ? t("portfolio.apps", { count: n })
+        : `${n} ${typeLabel}`,
+    [cardType, typeLabel, t],
+  );
+
   const printParams = useMemo(() => {
     const params: { label: string; value: string }[] = [];
     params.push({ label: t("portfolio.groupBy"), value: groupByLabel });
@@ -946,9 +1033,9 @@ export default function PortfolioReport() {
 
   return (
     <ReportShell
-      title={t("portfolio.title")}
-      icon="dashboard"
-      iconColor="#0f7eb5"
+      title={resolvedTitle}
+      icon={typeIcon}
+      iconColor={typeColor}
       paginateRowSelector="[data-export-row]"
       view={view}
       onViewChange={setView}
@@ -989,6 +1076,25 @@ export default function PortfolioReport() {
       toolbar={
         <>
           {/* Row 1: Main controls */}
+          {showTypeSelector && (
+            <TextField
+              select
+              size="small"
+              label={t("flexiblePortfolio.cardType")}
+              value={cardType}
+              onChange={(e) => handleCardTypeChange(e.target.value)}
+              sx={{ minWidth: 200 }}
+            >
+              {cardTypeOptions.map((o) => (
+                <MenuItem key={o.key} value={o.key}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <MaterialSymbol icon={o.icon} size={16} color={o.color || theme.palette.text.secondary} />
+                    {o.label}
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             select
             size="small"
@@ -1090,7 +1196,7 @@ export default function PortfolioReport() {
                 color="text.secondary"
                 sx={{ fontWeight: 600 }}
               >
-                {t("portfolio.applicationFilters")}
+                {t("portfolio.typeFilters", { type: typeLabel })}
               </Typography>
               {hasActiveFilters && (
                 <Chip
@@ -1467,6 +1573,7 @@ export default function PortfolioReport() {
                       selectFields={selectFields}
                       onGroupClick={handleGroupClick}
                       onAppClick={handleAppClick}
+                      countLabel={countLabel}
                     />
                   </Box>
                 ))}
@@ -1514,7 +1621,7 @@ export default function PortfolioReport() {
                     </Typography>
                     <Chip
                       size="small"
-                      label={t("portfolio.apps", { count: ungrouped.length })}
+                      label={countLabel(ungrouped.length)}
                       sx={{
                         height: 22,
                         fontSize: "0.72rem",
@@ -1810,7 +1917,7 @@ export default function PortfolioReport() {
       <SaveReportDialog
         open={saved.saveDialogOpen}
         onClose={() => saved.setSaveDialogOpen(false)}
-        reportType="portfolio"
+        reportType={savedReportKey}
         config={getConfig()}
         thumbnail={thumbnail}
       />

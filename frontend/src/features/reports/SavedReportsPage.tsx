@@ -28,6 +28,7 @@ import type { SavedReport } from "@/types";
 
 const REPORT_TYPE_STYLE: Record<string, { icon: string; color: string; path: string }> = {
   portfolio: { icon: "dashboard", color: "#1976d2", path: "/reports/portfolio" },
+  "flexible-portfolio": { icon: "dashboard_customize", color: "#1976d2", path: "/reports/flexible-portfolio" },
   "capability-map": { icon: "grid_view", color: "#003399", path: "/reports/capability-map" },
   lifecycle: { icon: "timeline", color: "#2e7d32", path: "/reports/lifecycle" },
   dependencies: { icon: "hub", color: "#e65100", path: "/reports/dependencies" },
@@ -49,6 +50,7 @@ export default function SavedReportsPage() {
 
   const REPORT_TYPE_LABELS: Record<string, string> = useMemo(() => ({
     portfolio: t("saved.typePortfolio"),
+    "flexible-portfolio": t("saved.typeFlexiblePortfolio"),
     "capability-map": t("saved.typeCapabilityMap"),
     lifecycle: t("saved.typeLifecycle"),
     dependencies: t("saved.typeDependencies"),

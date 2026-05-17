@@ -20,6 +20,7 @@ const InventoryPage = lazy(() => import("@/features/inventory/InventoryPage"));
 const CardDetail = lazy(() => import("@/features/cards/CardDetail"));
 const ErrorBoundary = lazy(() => import("@/components/ErrorBoundary"));
 const PortfolioReport = lazy(() => import("@/features/reports/PortfolioReport"));
+const FlexiblePortfolioReport = lazy(() => import("@/features/reports/FlexiblePortfolioReport"));
 const CapabilityMapReport = lazy(() => import("@/features/reports/CapabilityMapReport"));
 const LifecycleReport = lazy(() => import("@/features/reports/LifecycleReport"));
 const DependencyReport = lazy(() => import("@/features/reports/DependencyReport"));
@@ -127,6 +128,7 @@ function AppRoutes() {
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/cards/:id" element={<ErrorBoundary label="Card Detail"><CardDetail /></ErrorBoundary>} />
                 <Route path="/reports/portfolio" element={<PortfolioReport />} />
+                <Route path="/reports/flexible-portfolio" element={<FlexiblePortfolioReport />} />
                 <Route path="/reports/capability-map" element={<CapabilityMapReport />} />
                 <Route path="/reports/lifecycle" element={<LifecycleReport />} />
                 <Route path="/reports/dependencies" element={<DependencyReport />} />

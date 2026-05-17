@@ -61,6 +61,7 @@ const NAV_ITEM_DEFS: NavItemDef[] = [
     permission: "reports.ea_dashboard",
     children: [
       { labelKey: "reports.portfolio", icon: "dashboard", path: "/reports/portfolio" },
+      { labelKey: "reports.flexiblePortfolio", icon: "dashboard_customize", path: "/reports/flexible-portfolio" },
       { labelKey: "reports.capabilityMap", icon: "grid_view", path: "/reports/capability-map" },
       { labelKey: "reports.lifecycle", icon: "timeline", path: "/reports/lifecycle" },
       { labelKey: "reports.dependencies", icon: "hub", path: "/reports/dependencies" },

@@ -3,6 +3,7 @@
   "inventory": "资产清单",
   "reports": "报告",
   "reports.portfolio": "组合分析",
+  "reports.flexiblePortfolio": "灵活组合分析",
   "reports.capabilityMap": "能力地图",
   "reports.lifecycle": "生命周期",
   "reports.dependencies": "依赖关系",

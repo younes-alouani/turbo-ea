@@ -5,6 +5,17 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.19.0] - 2026-05-16
+
+Adds a **Flexible Portfolio** report alongside the Application Portfolio. Same chart, same grouping/colour/filter controls, same saved-report and AI-insights surface — but with a card-type picker at the top of the toolbar so the report can analyse a portfolio of Business Capabilities, Initiatives, IT Components, or any other visible card type rather than being hardcoded to Applications.
+
+### Added
+- **Flexible Portfolio report** at `/reports/flexible-portfolio`. New nav entry under Reports; saves independently of the Application Portfolio (own localStorage bucket, own `flexible-portfolio` saved-report type). The Application Portfolio at `/reports/portfolio` is unchanged.
+
+### Changed
+- `GET /reports/app-portfolio` now accepts an optional `?type=<card-type-key>` query parameter. Defaults to `Application` so existing callers (including the legacy Application Portfolio frontend) keep working unchanged. Unknown or hidden types return 404. The handler reuses the same `reports.portfolio` permission.
+- `PortfolioReport.tsx` now accepts `initialCardType`, `showTypeSelector`, and `savedReportKey` props so the Application Portfolio and Flexible Portfolio share one component instead of duplicating ~1,800 lines. The Application Portfolio renders with defaults (`Application`, no selector, key `portfolio`); the Flexible Portfolio renders with `showTypeSelector` and key `flexible-portfolio`.
+
 ## [1.18.0] - 2026-05-16
 
 Relocates the compliance scanner out of TurboLens AI and into its own home under GRC. The CVE half of the old "Security & Compliance" tab was removed in `1.11.1` (and finished cleaning up in `1.17.1`); what remained was the regulation gap-analysis scanner, which has nothing to do with vendor analysis, duplicate detection, or any of TurboLens's other AI-intelligence features. It's a GRC concern. This release moves it physically (frontend folder, backend service file), structurally (URL paths, permission keys, DB table, type names, i18n keys), and conceptually (the Compliance tab is now reachable without AI configured — only the *scan trigger* is gated).

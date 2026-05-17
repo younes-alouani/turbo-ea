@@ -3,6 +3,7 @@
   "inventory": "Inventario",
   "reports": "Report",
   "reports.portfolio": "Portfolio",
+  "reports.flexiblePortfolio": "Portfolio flessibile",
   "reports.capabilityMap": "Mappa delle capacità",
   "reports.lifecycle": "Ciclo di vita",
   "reports.dependencies": "Dipendenze",
