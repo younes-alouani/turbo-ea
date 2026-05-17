@@ -189,6 +189,7 @@
   "todos.tabs.todos": "Attività",
   "todos.tabs.surveys": "Sondaggi",
   "todos.actionRequired": "Azione richiesta",
+  "todos.overdue": "Scaduto",
   "todos.goToDocument": "Vai al documento",
   "todos.dueDate": "Scadenza: {{date}}",
   "todos.empty": "Nessuna attività trovata.",

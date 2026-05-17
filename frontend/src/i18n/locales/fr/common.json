@@ -189,6 +189,7 @@
   "todos.tabs.todos": "Tâches",
   "todos.tabs.surveys": "Enquêtes",
   "todos.actionRequired": "Action requise",
+  "todos.overdue": "En retard",
   "todos.goToDocument": "Aller au document",
   "todos.dueDate": "Échéance : {{date}}",
   "todos.empty": "Aucune tâche trouvée.",

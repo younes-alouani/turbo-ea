@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -211,11 +211,15 @@ async def my_workspace_summary(
         )
     ).scalar() or 0
 
-    # Open todos assigned to the user.
+    # Open todos that count as "mine": same definition as GET /todos?mine=true —
+    # todos either assigned to the calling user, or created by them. Anything
+    # narrower causes the workspace counter to disagree with the list rendered
+    # right under it.
+    my_todo_clause = or_(Todo.assigned_to == user.id, Todo.created_by == user.id)
     open_todo_count = (
         await db.execute(
             select(func.count(Todo.id)).where(
-                Todo.assigned_to == user.id,
+                my_todo_clause,
                 Todo.status == "open",
             )
         )
@@ -237,7 +241,7 @@ async def my_workspace_summary(
     overdue_todo_count = (
         await db.execute(
             select(func.count(Todo.id)).where(
-                Todo.assigned_to == user.id,
+                my_todo_clause,
                 Todo.status == "open",
                 Todo.due_date.is_not(None),
                 Todo.due_date < today,
@@ -245,14 +249,19 @@ async def my_workspace_summary(
         )
     ).scalar() or 0
 
+    # A card is "yours" when you either created it or hold any stakeholder
+    # role on it — both make you accountable for keeping its approval state
+    # current, which is what this counter is supposed to surface.
+    stakeholder_cards_sq = select(Stakeholder.card_id).where(Stakeholder.user_id == user.id)
     broken_card_count = (
         await db.execute(
-            select(func.count(func.distinct(Card.id)))
-            .join(Stakeholder, Stakeholder.card_id == Card.id)
-            .where(
-                Stakeholder.user_id == user.id,
+            select(func.count(Card.id)).where(
                 Card.status == "ACTIVE",
                 Card.approval_status == "BROKEN",
+                or_(
+                    Card.created_by == user.id,
+                    Card.id.in_(stakeholder_cards_sq),
+                ),
             )
         )
     ).scalar() or 0

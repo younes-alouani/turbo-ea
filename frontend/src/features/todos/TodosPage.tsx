@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Box from "@mui/material/Box";
@@ -18,13 +18,33 @@ import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import MaterialSymbol from "@/components/MaterialSymbol";
 import { api } from "@/api/client";
+import { useDateFormat } from "@/hooks/useDateFormat";
 import type { Todo, MySurveyItem } from "@/types";
+
+function compareByDueDateDesc(a: Todo, b: Todo): number {
+  // Sort by due date descending, with rows missing a due date pushed to
+  // the bottom so they don't crowd out actionable items.
+  if (!a.due_date && !b.due_date) return 0;
+  if (!a.due_date) return 1;
+  if (!b.due_date) return -1;
+  return b.due_date.localeCompare(a.due_date);
+}
+
+function isOverdue(todo: Todo): boolean {
+  if (todo.status !== "open" || !todo.due_date) return false;
+  // due_date is an ISO date (YYYY-MM-DD); compare against today in the
+  // user's local timezone using the same YYYY-MM-DD shape.
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return todo.due_date.slice(0, 10) < todayStr;
+}
 
 /* ── Todos sub-panel ─────────────────────────────────────────────────── */
 
 function TodosPanel() {
   const { t } = useTranslation("common");
   const navigate = useNavigate();
+  const { formatDate } = useDateFormat();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [tab, setTab] = useState(0);
 
@@ -32,6 +52,8 @@ function TodosPanel() {
     const params = tab === 0 ? "?status=open" : tab === 1 ? "?status=done" : "";
     api.get<Todo[]>(`/todos${params}`).then(setTodos);
   }, [tab]);
+
+  const sortedTodos = useMemo(() => [...todos].sort(compareByDueDateDesc), [todos]);
 
   const toggleStatus = async (todo: Todo) => {
     const newStatus = todo.status === "open" ? "done" : "open";
@@ -60,7 +82,7 @@ function TodosPanel() {
       </Tabs>
 
       <List>
-        {todos.map((todo) => (
+        {sortedTodos.map((todo) => (
           <Card key={todo.id} sx={{ mb: 1 }}>
             <ListItem>
               {todo.is_system ? (
@@ -108,6 +130,14 @@ function TodosPanel() {
                 }
                 secondary={
                   <Box sx={{ display: "flex", gap: 1, mt: 0.5, alignItems: "center" }}>
+                    {isOverdue(todo) && (
+                      <Chip
+                        size="small"
+                        label={t("todos.overdue")}
+                        color="error"
+                        sx={{ height: 20, fontSize: "0.7rem", fontWeight: 600 }}
+                      />
+                    )}
                     {todo.is_system && (
                       <Chip
                         size="small"
@@ -126,7 +156,9 @@ function TodosPanel() {
                       />
                     )}
                     {todo.due_date && (
-                      <Typography variant="caption">{t("todos.dueDate", { date: todo.due_date })}</Typography>
+                      <Typography variant="caption">
+                        {t("todos.dueDate", { date: formatDate(todo.due_date) })}
+                      </Typography>
                     )}
                   </Box>
                 }
