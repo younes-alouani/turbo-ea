@@ -186,6 +186,32 @@ class TestListCards:
         assert "App One" in names
         assert "App Two" in names
 
+    async def test_list_filters_by_comma_separated_types(self, client, db, cards_env):
+        """`?type=A,B` returns the union of both types with correct total.
+
+        Used by the diagram Insert-Cards dialog when more than one type
+        chip is selected — without this the dialog used to silently fetch
+        an unfiltered page and filter client-side (#569).
+        """
+        admin = cards_env["admin"]
+        await create_card_type(db, key="DataObject", label="Data Object")
+        await create_card_type(db, key="Interface", label="Interface")
+
+        await create_card(db, card_type="Application", name="App A", user_id=admin.id)
+        await create_card(db, card_type="DataObject", name="Data A", user_id=admin.id)
+        await create_card(db, card_type="DataObject", name="Data B", user_id=admin.id)
+        await create_card(db, card_type="Interface", name="Iface A", user_id=admin.id)
+
+        response = await client.get(
+            "/api/v1/cards?type=Application,DataObject",
+            headers=auth_headers(admin),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        names = {item["name"] for item in data["items"]}
+        assert names == {"App A", "Data A", "Data B"}
+        assert data["total"] == 3
+
     async def test_search_filter(self, client, db, cards_env):
         admin = cards_env["admin"]
         await create_card(db, card_type="Application", name="Searchable App", user_id=admin.id)

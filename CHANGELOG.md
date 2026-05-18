@@ -5,6 +5,14 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.22.2] - 2026-05-18
+
+### Fixed
+- **Diagram Insert-Cards dialog no longer truncates the result list.** The dialog and the diagram editor's left card rail used to hard-cap at 200 cards with no way to reach the rest, and selecting two or more card-type chips silently filtered an unfiltered backend page client-side — leaving arbitrary cards inaccessible. Both now use a shared paginated search that talks to the backend with the full type filter and an `IntersectionObserver` sentinel that loads the next page when the user scrolls toward the bottom. ([#569](https://github.com/vincentmakes/turbo-ea/issues/569))
+
+### Changed
+- **`GET /cards?type=` accepts a comma-separated list.** Mirrors the existing behaviour of `?status=`. A single value still goes through `==`, multiple values use `IN`. Used by the diagram dialog when more than one card-type chip is selected.
+
 ## [1.22.1] - 2026-05-18
 
 ### Fixed

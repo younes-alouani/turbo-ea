@@ -453,8 +453,13 @@ async def list_cards(
         count_q = count_q.where(Card.id.in_(id_list))
 
     if type:
-        q = q.where(Card.type == type)
-        count_q = count_q.where(Card.type == type)
+        types_list = [t.strip() for t in type.split(",") if t.strip()]
+        if len(types_list) == 1:
+            q = q.where(Card.type == types_list[0])
+            count_q = count_q.where(Card.type == types_list[0])
+        elif types_list:
+            q = q.where(Card.type.in_(types_list))
+            count_q = count_q.where(Card.type.in_(types_list))
     if status:
         statuses = [s.strip() for s in status.split(",") if s.strip()]
         if len(statuses) == 1:

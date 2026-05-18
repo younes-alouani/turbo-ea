@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
@@ -18,7 +18,8 @@ import MaterialSymbol from "@/components/MaterialSymbol";
 import { api } from "@/api/client";
 import { useMetamodel } from "@/hooks/useMetamodel";
 import { useResolveMetaLabel } from "@/hooks/useResolveLabel";
-import type { Card, CardListResponse, CardType } from "@/types";
+import type { Card, CardType } from "@/types";
+import { useCardSearch } from "./useCardSearch";
 
 interface CountsResponse {
   by_type: { type: string; count: number }[];
@@ -62,9 +63,7 @@ export default function InsertCardsDialog({
   const [counts, setCounts] = useState<Map<string, number>>(new Map());
   const [selectedTypeKeys, setSelectedTypeKeys] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<Card[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
   const [confirmInsertAll, setConfirmInsertAll] = useState(false);
 
@@ -73,11 +72,16 @@ export default function InsertCardsDialog({
     if (open) return;
     setSelectedTypeKeys(new Set());
     setSearch("");
-    setResults([]);
-    setTotal(0);
+    setDebouncedSearch("");
     setSelectedCardIds(new Set());
     setConfirmInsertAll(false);
   }, [open]);
+
+  // Debounce search so each keystroke doesn't refetch.
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedSearch(search), 200);
+    return () => window.clearTimeout(handle);
+  }, [search]);
 
   // Fetch type counts once per open.
   useEffect(() => {
@@ -88,44 +92,38 @@ export default function InsertCardsDialog({
       .catch(() => setCounts(new Map()));
   }, [open]);
 
-  // Search whenever filters change. Debounced to avoid hammering the API.
+  const typeKeys = useMemo(() => Array.from(selectedTypeKeys), [selectedTypeKeys]);
+  // Skip the initial empty query — wait for the user to pick a chip or search.
+  const searchEnabled = open && (typeKeys.length > 0 || debouncedSearch.trim().length > 0);
+
+  const {
+    items: results,
+    total,
+    loading,
+    hasMore,
+    loadMore,
+  } = useCardSearch({
+    types: typeKeys,
+    search: debouncedSearch,
+    enabled: searchEnabled,
+  });
+
+  // Infinite scroll: load the next page when the sentinel scrolls into view.
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!open) return;
-    const handle = window.setTimeout(() => {
-      const params = new URLSearchParams({ page_size: "200" });
-      if (selectedTypeKeys.size === 1) {
-        params.set("type", Array.from(selectedTypeKeys)[0]);
-      }
-      if (search.trim()) params.set("search", search.trim());
-
-      // Skip the initial empty query in single-mode picker (no chips, no
-      // search) — wait for the user to narrow it.
-      if (selectedTypeKeys.size === 0 && !search.trim()) {
-        setResults([]);
-        setTotal(0);
-        return;
-      }
-
-      setLoading(true);
-      api
-        .get<CardListResponse>(`/cards?${params.toString()}`)
-        .then((r) => {
-          let items = r.items;
-          // Client-side filter when multiple types are selected.
-          if (selectedTypeKeys.size > 1) {
-            items = items.filter((c) => selectedTypeKeys.has(c.type));
-          }
-          setResults(items);
-          setTotal(items.length);
-        })
-        .catch(() => {
-          setResults([]);
-          setTotal(0);
-        })
-        .finally(() => setLoading(false));
-    }, 200);
-    return () => window.clearTimeout(handle);
-  }, [open, selectedTypeKeys, search]);
+    const sentinel = sentinelRef.current;
+    const root = scrollContainerRef.current;
+    if (!sentinel || !root || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { root, rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore, results.length]);
 
   const toggleType = useCallback((key: string) => {
     setSelectedTypeKeys((prev) => {
@@ -288,16 +286,18 @@ export default function InsertCardsDialog({
               }}
             />
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-              {selectedTypeKeys.size === 0 && !search.trim()
+              {!searchEnabled
                 ? t("insertDialog.selectOrSearch")
-                : t("insertDialog.resultsCount", { count: total })}
+                : hasMore
+                  ? t("insertDialog.showingOf", { loaded: results.length, total })
+                  : t("insertDialog.resultsCount", { count: total })}
             </Typography>
           </Box>
 
           <Divider />
 
-          <Box sx={{ flex: 1, overflow: "auto" }}>
-            {loading ? (
+          <Box ref={scrollContainerRef} sx={{ flex: 1, overflow: "auto" }}>
+            {loading && results.length === 0 ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                 <CircularProgress size={24} />
               </Box>
@@ -305,7 +305,7 @@ export default function InsertCardsDialog({
               <Box sx={{ textAlign: "center", py: 6, color: "text.disabled" }}>
                 <MaterialSymbol icon="search_off" size={36} color="#bbb" />
                 <Typography variant="body2" sx={{ mt: 1 }}>
-                  {selectedTypeKeys.size === 0 && !search.trim()
+                  {!searchEnabled
                     ? t("insertDialog.selectOrSearch")
                     : t("insertDialog.empty")}
                 </Typography>
@@ -394,6 +394,24 @@ export default function InsertCardsDialog({
                     </Box>
                   );
                 })}
+                {hasMore && (
+                  <Box
+                    ref={sentinelRef}
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: 1,
+                      py: 2,
+                      color: "text.secondary",
+                    }}
+                  >
+                    <CircularProgress size={16} />
+                    <Typography variant="caption">
+                      {t("insertDialog.loadingMore")}
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             )}
           </Box>
