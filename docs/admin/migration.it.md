@@ -4,19 +4,13 @@ L'importatore di migrazione di piattaforma (**Amministrazione → Impostazioni �
 
 ## A chi è rivolto?
 
-Ai clienti che migrano da LeanIX (SAP LeanIX) a Turbo EA. L'importatore accetta **due formati di snapshot**, entrambi rilevati automaticamente dal contenuto del file:
-
-- **Full Export `.xlsx`** (predefinito per la maggior parte dei clienti) — la cartella di lavoro multi-foglio prodotta da LeanIX tramite *Reports → Full Export*. Un foglio per tipo di fact sheet, un foglio per tipo di relazione, più `TagGroups`, `Tags`, `Documents`, `Comments`, `Types` e un foglio di riferimento `ReadMe`. Qualunque utente LeanIX può produrlo; non è richiesto accesso amministratore.
-- **Snapshot JSON compresso con gzip** (`workspace-<id>-<data>.json.gz`) — lo snapshot di clonazione tra tenant prodotto da **Administration → Workspace → Conduct a Data Snapshot**. Solo amministratori.
-
-Entrambi i formati confluiscono nello stesso modello interno — il parser rileva automaticamente quale è stato caricato in base al contenuto del file (sniff del magic ZIP `PK\x03\x04` per xlsx e gzip `\x1f\x8b` per il JSON), quindi un'estensione errata viene comunque instradata correttamente.
+Ai clienti che migrano da LeanIX (SAP LeanIX) a Turbo EA. L'importatore accetta la cartella di lavoro xlsx **Full Snapshot** di LeanIX — l'export multi-foglio con un foglio per tipo di fact sheet, un foglio per tipo di relazione, più `TagGroups`, `Tags`, `Documents`, `Comments`, `Types` e un foglio di riferimento `ReadMe`. I caricamenti in altri formati vengono rifiutati già al momento dell'upload con un messaggio di errore chiaro.
 
 ## Come ottenere l'esportazione
 
-- **Full Export xlsx** — In LeanIX, **Reports → … → Full Export** produce un file come `20260518_snapshot_demo.xlsx`. Contiene tutte le fact sheet attive, tutte le relazioni, i metadati di tag/documenti/commenti e un foglio `ReadMe` che descrive ogni colonna e i suoi valori ammessi.
-- **Snapshot JSON Workspace** — In LeanIX, **Administration → Workspace → Conduct a Data Snapshot** attiva lo snapshot di clonazione tra tenant. Il file di output si chiama tipicamente `workspace-<id>-<data>.json.gz`. È necessario l'accesso amministratore in LeanIX.
+In LeanIX, aprire **Administration → Export → Full Snapshot**. Questa azione produce una singola cartella XLSX contenente tutte le fact sheet **attive**, le loro relazioni, i gruppi di tag, i tag, i documenti (chiamati *resources* in LeanIX) e i commenti.
 
-Se non avete accesso amministratore in LeanIX ma disponete di un token API di tenant, la combinazione delle query GraphQL `allFactSheets`, `subscriptions`, `relations` e `documents` produce un dataset JSON corrispondente al formato snapshot — l'importatore lo accetta anch'esso.
+**Le fact sheet archiviate non sono incluse** nel Full Snapshot — ripristinatele prima in LeanIX se desiderate che approdino in Turbo EA.
 
 ## Il flusso di lavoro
 
@@ -30,7 +24,7 @@ Se non avete accesso amministratore in LeanIX ma disponete di un token API di te
 
     I tab **Nuovi tipi**, **Campi personalizzati** e **Nuove relazioni** mostrano il metamodello personalizzato del tenant dal vostro workspace LeanIX. Per default sono accettati così come sono e creano tipi di carta / campi / tipi di relazione non-built-in corrispondenti in Turbo EA. Per un controllo più fine, modificate la chiave/etichetta/tipo proposti nel JSON dello staged record prima di applicare.
 
-3. **Applicare** quando siete soddisfatti. La pipeline di apply esegue 12 passate ordinate per dipendenze dentro savepoint individuali — una riga fallita non avvelena il resto dell'import. Lo stato passa da `applying → applied` (o `failed` se gli errori superano la soglia di sicurezza).
+3. **Applicare** quando siete soddisfatti. La pipeline di apply esegue 12 passate ordinate per dipendenze (tipi del metamodello → campi del metamodello → tipi di relazione del metamodello → utenti → carte → gruppi di tag → tag → collegamenti carta-tag → relazioni → sottoscrizioni → documenti → commenti) dentro savepoint individuali — una riga fallita non avvelena il resto dell'import. Lo stato passa da `applying → applied` (o `failed` se gli errori superano la soglia di sicurezza).
 
 ## Cosa viene importato
 

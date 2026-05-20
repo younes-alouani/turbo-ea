@@ -4,19 +4,13 @@ L'importateur de migration de plateforme (**Administration → Paramètres → M
 
 ## À qui s'adresse-t-il ?
 
-Aux clients qui migrent de LeanIX (SAP LeanIX) vers Turbo EA. L'importateur accepte **deux formats de snapshot**, tous deux détectés automatiquement selon le contenu du fichier :
-
-- **Export complet `.xlsx`** (par défaut pour la plupart des clients) — le classeur multi-feuilles produit par LeanIX via *Reports → Full Export*. Une feuille par type de fact sheet, une feuille par type de relation, ainsi que `TagGroups`, `Tags`, `Documents`, `Comments`, `Types` et une feuille de référence `ReadMe`. N'importe quel utilisateur LeanIX peut le produire ; aucun accès admin requis.
-- **Snapshot JSON gzippé** (`workspace-<id>-<date>.json.gz`) — le snapshot de clonage de tenant produit via **Administration → Workspace → Conduct a Data Snapshot**. Admin uniquement.
-
-Les deux formats atterrissent sur le même modèle interne — le parser détecte automatiquement lequel a été chargé en analysant le contenu du fichier (magic ZIP `PK\x03\x04` pour xlsx, magic gzip `\x1f\x8b` pour le JSON), donc une extension mal nommée est correctement routée.
+Aux clients qui migrent de LeanIX (SAP LeanIX) vers Turbo EA. L'importateur accepte le classeur xlsx **Full Snapshot** de LeanIX — l'export multi-feuilles comportant une feuille par type de fact sheet, une feuille par type de relation, ainsi que `TagGroups`, `Tags`, `Documents`, `Comments`, `Types` et une feuille de référence `ReadMe`. Les téléchargements dans d'autres formats sont rejetés dès l'upload avec un message d'erreur explicite.
 
 ## Comment obtenir l'export
 
-- **Export complet xlsx** — Dans LeanIX, **Reports → … → Full Export** produit un fichier comme `20260518_snapshot_demo.xlsx`. Il contient toutes les fact sheets actives, toutes les relations, les métadonnées tag/document/commentaire et une feuille `ReadMe` décrivant chaque colonne et ses valeurs autorisées.
-- **Snapshot JSON Workspace** — Dans LeanIX, **Administration → Workspace → Conduct a Data Snapshot** déclenche le snapshot de clonage. Le fichier de sortie s'appelle typiquement `workspace-<id>-<date>.json.gz`. Un accès admin LeanIX est requis.
+Dans LeanIX, ouvrez **Administration → Export → Full Snapshot**. Cette action produit un unique classeur XLSX contenant toutes les fact sheets **actives**, ainsi que leurs relations, groupes de tags, tags, documents (appelés *resources* dans LeanIX) et commentaires.
 
-Si vous n'avez pas d'accès admin LeanIX mais disposez d'un token API au niveau tenant, la combinaison des requêtes GraphQL `allFactSheets`, `subscriptions`, `relations` et `documents` produit un dataset JSON conforme au format snapshot — l'importateur l'accepte également.
+**Les fact sheets archivées ne sont pas incluses** dans le Full Snapshot — restaurez-les d'abord dans LeanIX si vous souhaitez qu'elles atterrissent dans Turbo EA.
 
 ## Le flux de travail
 
@@ -30,7 +24,7 @@ Si vous n'avez pas d'accès admin LeanIX mais disposez d'un token API au niveau 
 
     Les onglets **Nouveaux types**, **Champs personnalisés** et **Nouvelles relations** affichent le métamodèle personnalisé du tenant issu de votre workspace LeanIX. Par défaut, ils sont acceptés tels quels et créent les types de cartes / champs / types de relations non-built-in correspondants dans Turbo EA. Pour un contrôle plus fin, éditez la clé/le libellé/le type proposés dans le JSON du staged record avant d'appliquer.
 
-3. **Appliquer** quand vous êtes satisfait. Le pipeline d'application exécute 12 passes ordonnées par dépendances dans des savepoints individuels — une ligne en échec n'empoisonne pas le reste de l'import. Le statut passe de `applying → applied` (ou `failed` si les erreurs franchissent le seuil de sécurité).
+3. **Appliquer** quand vous êtes satisfait. Le pipeline d'application exécute 12 passes ordonnées par dépendances (types de métamodèle → champs de métamodèle → types de relations de métamodèle → utilisateurs → cartes → groupes de tags → tags → liaisons carte-tag → relations → souscriptions → documents → commentaires) dans des savepoints individuels — une ligne en échec n'empoisonne pas le reste de l'import. Le statut passe de `applying → applied` (ou `failed` si les erreurs franchissent le seuil de sécurité).
 
 ## Ce qui est importé
 

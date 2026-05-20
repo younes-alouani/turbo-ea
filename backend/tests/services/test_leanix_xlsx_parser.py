@@ -14,8 +14,7 @@ from io import BytesIO
 
 from openpyxl import Workbook  # type: ignore[import-untyped]
 
-from app.services.leanix_snapshot_parser import parse_snapshot_path
-from app.services.leanix_xlsx_parser import is_xlsx_payload, parse_xlsx
+from app.services.leanix_xlsx_parser import is_xlsx_payload, parse_xlsx, parse_xlsx_path
 
 
 def _write_sheet(wb: Workbook, name: str, rows: list[list]) -> None:
@@ -488,13 +487,15 @@ def test_unknown_factsheet_type_passes_through_for_admin_review() -> None:
     assert any(t.name == "ESGCapability" for t in snap.metamodel_types)
 
 
-def test_parse_snapshot_path_dispatches_xlsx_via_magic_bytes(tmp_path) -> None:
-    """``parse_snapshot_path`` must route xlsx files to the xlsx parser
-    even when the path has no ``.xlsx`` extension — content-based
-    detection is the contract."""
+def test_parse_xlsx_path_loads_workbook_regardless_of_extension(tmp_path) -> None:
+    """``parse_xlsx_path`` must load xlsx files even when the path has
+    no ``.xlsx`` extension — uploaded snapshots are stored under a
+    neutral ``.bin`` suffix so openpyxl's extension check doesn't kick
+    in, and content-based loading is the only path that works for both
+    ``upload.xlsx`` and stored snapshots."""
     wb_path = tmp_path / "export.bin"
     wb = _minimal_workbook()
     wb.save(str(wb_path))
-    snap = parse_snapshot_path(str(wb_path))
+    snap = parse_xlsx_path(str(wb_path))
     assert snap.version == "xlsx"
     assert len(snap.fact_sheets) == 3

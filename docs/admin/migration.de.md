@@ -4,19 +4,13 @@ Der Plattform-Migrations-Importer (**Admin → Einstellungen → Migration**) im
 
 ## Für wen ist das?
 
-Für Kunden, die von LeanIX (SAP LeanIX) zu Turbo EA wechseln. Der Importer akzeptiert **zwei Snapshot-Formate**, beide automatisch nach Dateiinhalt erkannt:
-
-- **`.xlsx` Full Export** (Standard für die meisten Kunden) — die mehrfache Excel-Mappe, die LeanIX über *Reports → Full Export* erzeugt. Ein Blatt pro Fact-Sheet-Typ, ein Blatt pro Beziehungstyp, plus `TagGroups`, `Tags`, `Documents`, `Comments`, `Types` und ein `ReadMe`-Referenzblatt. Jeder LeanIX-Benutzer kann diese Datei erzeugen; kein Admin-Zugang erforderlich.
-- **gzip-komprimierter JSON Workspace-Snapshot** (`workspace-<id>-<datum>.json.gz`) — der Mandanten-Klon-Snapshot, der über **Administration → Workspace → Conduct a Data Snapshot** erzeugt wird. Nur für Admins.
-
-Beide Formate landen im selben internen Modell — der Parser erkennt anhand des Dateiinhalts (ZIP-Magic `PK\x03\x04` für xlsx, gzip-Magic `\x1f\x8b` für JSON), welches Format geladen wurde, sodass selbst eine falsch benannte Datei korrekt verarbeitet wird.
+Für Kunden, die von LeanIX (SAP LeanIX) zu Turbo EA wechseln. Der Importer akzeptiert die LeanIX-**Full-Snapshot**-xlsx-Mappe — der mehrblättrige Export mit einem Blatt pro Fact-Sheet-Typ, einem Blatt pro Beziehungstyp, plus `TagGroups`, `Tags`, `Documents`, `Comments`, `Types` und einem `ReadMe`-Referenzblatt. Uploads in anderen Formaten werden bereits beim Hochladen mit einer klaren Fehlermeldung abgelehnt.
 
 ## So erhalten Sie den Export
 
-- **xlsx Full Export** — In LeanIX erzeugt **Reports → … → Full Export** eine Datei wie `20260518_snapshot_demo.xlsx` mit allen aktiven Fact Sheets, allen Beziehungen, den Tag-/Dokument-/Kommentar-Metadaten und einem `ReadMe`-Blatt, das jede Spalte und ihre zulässigen Werte dokumentiert.
-- **JSON Workspace-Snapshot** — In LeanIX löst **Administration → Workspace → Conduct a Data Snapshot** den Mandanten-Klon-Snapshot aus. Die Ausgabedatei heißt typischerweise `workspace-<id>-<datum>.json.gz`. Für diesen Export benötigen Sie Admin-Zugang in LeanIX.
+In LeanIX öffnen Sie **Administration → Export → Full Snapshot**. Dadurch entsteht eine einzelne XLSX-Mappe mit allen **aktiven** Fact Sheets sowie deren Beziehungen, Tag-Gruppen, Tags, Dokumenten (in LeanIX *Resources* genannt) und Kommentaren.
 
-Falls Sie keinen Admin-Zugang in LeanIX, aber ein Mandanten-API-Token haben, ergibt die Kombination aus den GraphQL-Abfragen `allFactSheets`, `subscriptions`, `relations` und `documents` ein JSON-Datenset im Snapshot-Format — der Importer akzeptiert es ebenfalls.
+**Archivierte Fact Sheets sind im Full Snapshot nicht enthalten** — stellen Sie sie zuerst in LeanIX wieder her, falls sie in Turbo EA landen sollen.
 
 ## Der Workflow
 
@@ -30,7 +24,7 @@ Falls Sie keinen Admin-Zugang in LeanIX, aber ein Mandanten-API-Token haben, erg
 
     Die Tabs **Neue Typen**, **Custom-Felder** und **Neue Beziehungen** zeigen das mandantenspezifische Metamodell aus Ihrem LeanIX-Workspace. Standardmäßig werden diese unverändert übernommen und legen passende Nicht-Built-in-Kartentypen / -Felder / -Beziehungstypen in Turbo EA an. Für feinere Kontrolle bearbeiten Sie den vorgeschlagenen Schlüssel/Label/Typ im Staged-Record-JSON vor dem Anwenden.
 
-3. **Anwenden**, sobald Sie zufrieden sind. Die Apply-Pipeline läuft in 12 abhängigkeitsgeordneten Pässen unter individuellen Savepoints — eine fehlerhafte Zeile vergiftet nicht den Rest des Imports. Status wechselt von `applying → applied` (oder `failed`, wenn Fehler die Sicherheitsschwelle überschreiten).
+3. **Anwenden**, sobald Sie zufrieden sind. Die Apply-Pipeline läuft in 12 abhängigkeitsgeordneten Pässen (Metamodell-Typen → Metamodell-Felder → Metamodell-Beziehungstypen → Benutzer → Karten → Tag-Gruppen → Tags → Karten-Tag-Zuordnungen → Beziehungen → Subscriptions → Dokumente → Kommentare) unter individuellen Savepoints — eine fehlerhafte Zeile vergiftet nicht den Rest des Imports. Status wechselt von `applying → applied` (oder `failed`, wenn Fehler die Sicherheitsschwelle überschreiten).
 
 ## Was wird importiert
 

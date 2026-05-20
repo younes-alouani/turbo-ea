@@ -19,7 +19,7 @@ Phase 1 surface (cards only):
   yet been applied.
 
 The HTTP layer is intentionally thin — every meaningful operation
-lives in :mod:`leanix_snapshot_parser`,
+lives in :mod:`leanix_xlsx_parser`,
 :mod:`leanix_migration_service`, and :mod:`leanix_migration_apply` so
 the same logic can be exercised from unit tests without spinning up a
 FastAPI app.
@@ -64,7 +64,7 @@ from app.services.leanix_migration_service import (
     stage_tags,
     stage_users_and_subscriptions,
 )
-from app.services.leanix_snapshot_parser import parse_snapshot_path
+from app.services.leanix_xlsx_parser import is_xlsx_payload, parse_xlsx_path
 from app.services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
@@ -167,6 +167,11 @@ async def upload_snapshot(
     raw = await file.read()
     if not raw:
         raise HTTPException(status_code=400, detail="Empty snapshot file")
+    if not is_xlsx_payload(raw[:4]):
+        raise HTTPException(
+            status_code=400,
+            detail="Only .xlsx LeanIX Full Snapshot exports are supported.",
+        )
     file_hash = hashlib.sha256(raw).hexdigest()
 
     # Reject duplicate uploads — the file hash is the natural idempotency key.
@@ -384,7 +389,7 @@ async def _parse_and_stage_job(migration_id_str: str) -> None:
                 logger.warning("LeanIX parse job: migration %s missing", migration_id_str)
                 return
 
-            snapshot = parse_snapshot_path(m.storage_path)
+            snapshot = parse_xlsx_path(m.storage_path)
             m.snapshot_version = snapshot.version
             include_archived = bool(
                 ((m.stats or {}).get("options") or {}).get("include_archived", False)

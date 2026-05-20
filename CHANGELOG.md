@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.24.0] - 2026-05-19
 
-New **Platform Migration (LeanIX)** importer turns a complete LeanIX workspace into Turbo EA cards, relations, tags, stakeholders, documents, comments, and a full custom metamodel in one staged, reviewable operation. Accepts both LeanIX export formats — auto-detected from file content — and lands every tenant customisation (custom card types, fields with full enum lists, relation types, hierarchy, lineage) end-to-end without a manual remap step.
+New **Platform Migration (LeanIX)** importer turns a complete LeanIX workspace into Turbo EA cards, relations, tags, stakeholders, documents, comments, and a full custom metamodel in one staged, reviewable operation. Accepts the LeanIX **Full Snapshot** xlsx workbook (Administration → Export → Full Snapshot in LeanIX) and lands every tenant customisation (custom card types, fields with full enum lists, relation types, hierarchy, lineage) end-to-end without a manual remap step.
 
 ### Added
 - **LeanIX importer foundations.** New admin section at **Settings → Migration**, gated by a new `admin.migrate` permission (admin role only by default). Upload a LeanIX snapshot, the parser stages every entity into `leanix_staged_records` for review, and a single click runs the dependency-ordered apply pipeline. Idempotent re-runs via the new `leanix_identity_map`. Surfaces three new tables (`leanix_migrations`, `leanix_staged_records`, `leanix_identity_map`) — Alembic `091_add_leanix_migration` + `092_widen_leanix_id_columns`. Permission, model, schema, service, apply, and HTTP layers split across `app/services/leanix_*` and `app/api/v1/migration.py`.

@@ -26,9 +26,11 @@ class LeanixMigration(UUIDMixin, TimestampMixin, Base):
     Status workflow: ``uploaded`` -> ``parsed`` -> ``previewed`` ->
     ``applying`` -> ``applied`` | ``failed`` | ``aborted``.
 
-    The snapshot binary itself lives on disk at
-    ``data/leanix_snapshots/{id}.json.gz`` to keep Postgres lean; the path is
-    captured in ``storage_path`` so cleanup on DELETE removes both.
+    The snapshot binary itself (an xlsx workbook, stored under a
+    neutral ``.bin`` suffix so openpyxl's extension check doesn't kick
+    in) lives on disk at ``data/leanix_snapshots/{id}.bin`` to keep
+    Postgres lean; the path is captured in ``storage_path`` so cleanup
+    on DELETE removes both.
     """
 
     __tablename__ = "leanix_migrations"

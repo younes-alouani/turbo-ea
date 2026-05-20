@@ -4,19 +4,13 @@ The platform-migration importer (**Admin → Settings → Migration**) ingests a
 
 ## Who is this for?
 
-Customers moving from LeanIX (SAP LeanIX) to Turbo EA. The importer accepts **two snapshot formats**:
-
-- **`.xlsx` Full Export** (default for most customers) — the multi-sheet workbook produced by LeanIX's *Reports → Full Export* function. One sheet per fact-sheet type, one sheet per relation type, plus `TagGroups`, `Tags`, `Documents`, `Comments`, `Types`, and a `ReadMe` reference sheet. Any LeanIX user can produce it; no admin access required.
-- **Gzipped JSON Workspace Snapshot** (`workspace-<id>-<date>.json.gz`) — the tenant-cloning snapshot produced via **Administration → Workspace → Conduct a Data Snapshot**. Admin-only.
-
-Both formats land on the same internal model — the parser auto-detects which one was uploaded based on the file content (it sniffs the ZIP magic `PK\x03\x04` for xlsx and the gzip magic `\x1f\x8b` for the JSON snapshot), so a mis-named extension still routes correctly.
+Customers moving from LeanIX (SAP LeanIX) to Turbo EA. The importer accepts the LeanIX **Full Snapshot** xlsx workbook — the multi-sheet export with one sheet per fact-sheet type, one sheet per relation type, plus `TagGroups`, `Tags`, `Documents`, `Comments`, `Types`, and a `ReadMe` reference sheet. Non-xlsx uploads are rejected at the upload step with a clear error.
 
 ## How to obtain the export
 
-- **xlsx Full Export** — In LeanIX, **Reports → … → Full Export** produces a workbook named like `20260518_snapshot_demo.xlsx`. The file contains every active fact sheet, every relation, the tag / document / comment metadata, and a `ReadMe` sheet describing every column and its allowed values.
-- **JSON Workspace Snapshot** — In LeanIX, **Administration → Workspace → Conduct a Data Snapshot** triggers the tenant-clone snapshot. The output file is named like `workspace-<id>-<date>.json.gz`. You will need admin access in LeanIX to trigger this export.
+In LeanIX, open **Administration → Export → Full Snapshot**. This produces a single XLSX workbook containing every **active** fact sheet, plus its relations, tag groups, tags, documents (called *resources* in LeanIX), and comments.
 
-If you do not have admin access in LeanIX but have a tenant-level API token, the GraphQL `allFactSheets` query plus `subscriptions`, `relations`, and `documents` queries together produce a JSON dataset that matches the snapshot shape — the importer accepts that too.
+**Archived fact sheets are not included** in the Full Snapshot — restore them in LeanIX first if you need them to land in Turbo EA.
 
 ## The workflow
 
@@ -30,7 +24,7 @@ If you do not have admin access in LeanIX but have a tenant-level API token, the
 
     The **New types**, **Custom fields**, and **New relations** tabs surface tenant-customised metamodel from your LeanIX workspace. By default, these are accepted as-is and create matching non-built-in card types / fields / relation types in Turbo EA. For finer control, edit the proposed key/label/type in the staged-record JSON before applying.
 
-3. **Apply** when you are satisfied. The apply pipeline runs 12 dependency-ordered passes inside individual savepoints — one failing row does not poison the rest of the import. Status moves through `applying → applied` (or `failed` if errors cross the safety threshold).
+3. **Apply** when you are satisfied. The apply pipeline runs 12 dependency-ordered passes (metamodel types → metamodel fields → metamodel relation types → users → cards → tag groups → tags → card-tag links → relations → subscriptions → documents → comments) inside individual savepoints — one failing row does not poison the rest of the import. Status moves through `applying → applied` (or `failed` if errors cross the safety threshold).
 
 ## What gets imported
 

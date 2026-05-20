@@ -4,19 +4,13 @@
 
 ## 适用对象？
 
-从 LeanIX（SAP LeanIX）迁移到 Turbo EA 的客户。导入器接受**两种快照格式**，二者均根据文件内容自动识别：
-
-- **`.xlsx` Full Export**（大多数客户的默认选择）— LeanIX 通过 *Reports → Full Export* 生成的多表工作簿。每个 fact sheet 类型一张工作表、每种关系类型一张工作表，外加 `TagGroups`、`Tags`、`Documents`、`Comments`、`Types` 和一张 `ReadMe` 参考表。任何 LeanIX 用户均可生成，无需管理员权限。
-- **gzip 压缩的 JSON 工作区快照**（`workspace-<id>-<date>.json.gz`）— 通过 **Administration → Workspace → Conduct a Data Snapshot** 生成的租户克隆快照，仅限管理员。
-
-两种格式最终落入同一内部模型 — 解析器根据文件内容（xlsx 的 ZIP 头 `PK\x03\x04`、JSON 快照的 gzip 头 `\x1f\x8b`）自动识别上传的格式，因此扩展名错误也能正确路由。
+从 LeanIX（SAP LeanIX）迁移到 Turbo EA 的客户。导入器接受 LeanIX **Full Snapshot** xlsx 工作簿 — 即多表导出，每个 fact sheet 类型一张工作表、每种关系类型一张工作表，外加 `TagGroups`、`Tags`、`Documents`、`Comments`、`Types` 和一张 `ReadMe` 参考表。其它格式的上传将在上传步骤即被拒绝，并附明确的错误提示。
 
 ## 如何获取导出
 
-- **xlsx Full Export** — 在 LeanIX 中，**Reports → … → Full Export** 生成形如 `20260518_snapshot_demo.xlsx` 的文件，包含所有活跃 fact sheet、所有关系、标签/文档/评论元数据，以及一张描述每一列及其允许值的 `ReadMe` 表。
-- **JSON Workspace Snapshot** — 在 LeanIX 中，**Administration → Workspace → Conduct a Data Snapshot** 触发租户克隆快照。输出文件通常名为 `workspace-<id>-<date>.json.gz`。需要 LeanIX 管理员权限。
+在 LeanIX 中打开 **Administration → Export → Full Snapshot**。该操作会生成一份 XLSX 工作簿，包含所有**活跃**的 fact sheet 及其关系、标签组、标签、文档（LeanIX 中称为 *resources*）和评论。
 
-如果您没有 LeanIX 管理员权限但拥有租户级 API 令牌，那么 GraphQL 的 `allFactSheets`、`subscriptions`、`relations` 和 `documents` 查询的组合可产生一个与快照格式相匹配的 JSON 数据集 — 导入器同样接受。
+**已归档的 fact sheet 不包含在 Full Snapshot 中** — 如需将其导入 Turbo EA，请先在 LeanIX 中将其恢复。
 
 ## 工作流程
 
@@ -30,7 +24,7 @@
 
     **新类型**、**自定义字段**和**新关系**标签页展示来自您 LeanIX 工作区的租户自定义元模型。默认情况下原样接受，并在 Turbo EA 中创建对应的非 built-in 卡片类型 / 字段 / 关系类型。需要更精细的控制时，在应用前于 staged record JSON 中编辑建议的键/标签/类型。
 
-3. **应用**：满意后即可。Apply 流水线在 12 个按依赖顺序排列的 pass 中、各自的 savepoint 内运行 — 单行失败不会污染整个 import。状态从 `applying → applied`（或 `failed`，如果错误超过安全阈值）。
+3. **应用**：满意后即可。Apply 流水线在 12 个按依赖顺序排列的 pass 中（元模型类型 → 元模型字段 → 元模型关系类型 → 用户 → 卡片 → 标签组 → 标签 → 卡片-标签关联 → 关系 → 订阅 → 文档 → 评论），各自的 savepoint 内运行 — 单行失败不会污染整个 import。状态从 `applying → applied`（或 `failed`，如果错误超过安全阈值）。
 
 ## 导入的内容
 

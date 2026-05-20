@@ -4,19 +4,13 @@ O importador de migração de plataforma (**Administração → Configurações 
 
 ## Para quem é isso?
 
-Para clientes que migram do LeanIX (SAP LeanIX) para o Turbo EA. O importador aceita **dois formatos de snapshot**, ambos detectados automaticamente pelo conteúdo do arquivo:
-
-- **Full Export `.xlsx`** (padrão para a maioria dos clientes) — a planilha multi-aba produzida pelo LeanIX via *Reports → Full Export*. Uma aba por tipo de fact sheet, uma aba por tipo de relação, mais `TagGroups`, `Tags`, `Documents`, `Comments`, `Types` e uma aba de referência `ReadMe`. Qualquer usuário do LeanIX pode produzi-lo; sem acesso de administrador requerido.
-- **Snapshot JSON comprimido com gzip** (`workspace-<id>-<data>.json.gz`) — o snapshot de clonagem entre tenants produzido via **Administration → Workspace → Conduct a Data Snapshot**. Apenas administradores.
-
-Ambos os formatos convergem para o mesmo modelo interno — o parser detecta automaticamente qual foi carregado pelo conteúdo do arquivo (magic ZIP `PK\x03\x04` para xlsx e magic gzip `\x1f\x8b` para o JSON), portanto uma extensão mal nomeada é roteada corretamente.
+Para clientes que migram do LeanIX (SAP LeanIX) para o Turbo EA. O importador aceita a planilha xlsx **Full Snapshot** do LeanIX — a exportação multi-aba com uma aba por tipo de fact sheet, uma aba por tipo de relação, mais `TagGroups`, `Tags`, `Documents`, `Comments`, `Types` e uma aba de referência `ReadMe`. Uploads em outros formatos são rejeitados já no passo de envio com uma mensagem de erro clara.
 
 ## Como obter a exportação
 
-- **Full Export xlsx** — No LeanIX, **Reports → … → Full Export** produz um arquivo como `20260518_snapshot_demo.xlsx`. Contém todas as fact sheets ativas, todas as relações, os metadados de tag/documento/comentário e uma aba `ReadMe` que descreve cada coluna e seus valores permitidos.
-- **Snapshot JSON Workspace** — No LeanIX, **Administration → Workspace → Conduct a Data Snapshot** dispara o snapshot de clonagem entre tenants. O arquivo de saída chama-se tipicamente `workspace-<id>-<data>.json.gz`. Requer acesso de administrador no LeanIX.
+No LeanIX, abra **Administration → Export → Full Snapshot**. Isso produz uma única planilha XLSX contendo todas as fact sheets **ativas**, além de suas relações, grupos de tags, tags, documentos (chamados *resources* no LeanIX) e comentários.
 
-Se não tiver acesso de administrador no LeanIX mas dispor de um token API a nível de tenant, a combinação das consultas GraphQL `allFactSheets`, `subscriptions`, `relations` e `documents` produz um dataset JSON correspondente ao formato snapshot — o importador também o aceita.
+**Fact sheets arquivadas não são incluídas** no Full Snapshot — restaure-as primeiro no LeanIX se desejar que cheguem ao Turbo EA.
 
 ## O fluxo de trabalho
 
@@ -30,7 +24,7 @@ Se não tiver acesso de administrador no LeanIX mas dispor de um token API a ní
 
     As abas **Novos tipos**, **Campos personalizados** e **Novas relações** exibem o metamodelo personalizado do tenant do seu workspace LeanIX. Por padrão são aceitas como estão e criam tipos de card / campos / tipos de relação não-built-in correspondentes no Turbo EA. Para controle mais fino, edite a chave/rótulo/tipo propostos no JSON do registro staged antes de aplicar.
 
-3. **Aplicar** quando estiver satisfeito. O pipeline de apply executa 12 passagens ordenadas por dependências em savepoints individuais — uma linha com falha não envenena o restante do import. O status avança de `applying → applied` (ou `failed` se os erros cruzarem o limite de segurança).
+3. **Aplicar** quando estiver satisfeito. O pipeline de apply executa 12 passagens ordenadas por dependências (tipos do metamodelo → campos do metamodelo → tipos de relação do metamodelo → usuários → cards → grupos de tags → tags → vínculos card-tag → relações → assinaturas → documentos → comentários) em savepoints individuais — uma linha com falha não envenena o restante do import. O status avança de `applying → applied` (ou `failed` se os erros cruzarem o limite de segurança).
 
 ## O que é importado
 

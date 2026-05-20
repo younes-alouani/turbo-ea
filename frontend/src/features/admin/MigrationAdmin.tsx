@@ -32,9 +32,9 @@ import MaterialSymbol from "@/components/MaterialSymbol";
 
 // Phase 1 admin surface for the LeanIX workspace-snapshot importer.
 // Lives under Settings → Migration. Minimal end-to-end flow: pick a
-// gzipped snapshot, watch the backend stage it, browse the diff, and
-// apply. Phase-3+ will swap the bare staged-record list for a richer
-// `MetamodelMappingPanel` and per-entity tabs.
+// LeanIX Full Snapshot xlsx workbook, watch the backend stage it,
+// browse the diff, and apply. Phase-3+ will swap the bare staged-record
+// list for a richer `MetamodelMappingPanel` and per-entity tabs.
 
 interface Migration {
   id: string;
@@ -643,7 +643,7 @@ function UploadDialog({ open, onClose, onSubmit }: UploadDialogProps) {
           <Typography variant="body2" color="text.secondary">
             {t(
               "migration.upload.help",
-              "Drop a gzipped LeanIX workspace snapshot here. The parser handles both .json and .json.gz files; the snapshot stays on disk and is purged when you delete the migration.",
+              "Drop a LeanIX Full Snapshot xlsx workbook here (Administration → Export → Full Snapshot in LeanIX). The file stays on disk and is purged when you delete the migration.",
             )}
           </Typography>
           <TextField
@@ -663,7 +663,7 @@ function UploadDialog({ open, onClose, onSubmit }: UploadDialogProps) {
             <input
               type="file"
               hidden
-              accept=".gz,.json,application/gzip,application/json"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
           </Button>
