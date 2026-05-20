@@ -487,6 +487,118 @@ def test_unknown_factsheet_type_passes_through_for_admin_review() -> None:
     assert any(t.name == "ESGCapability" for t in snap.metamodel_types)
 
 
+def test_generic_successor_relation_specialised_by_endpoint_type() -> None:
+    """LeanIX's xlsx contains two flavours of successor edges in the same
+    workbook: type-prefixed (``applicationSuccessorRelation``) and the
+    generic ``successorRelation`` row whose endpoint FS types
+    disambiguate which Turbo EA edge it should land on. The parser must
+    rewrite the generic form so the static LX→TEA relation map (and the
+    direction-flip set) catches it without further plumbing."""
+    wb = Workbook()
+    # Two Application fact sheets — an older app being replaced by a newer one.
+    _write_sheet(
+        wb,
+        "Application",
+        [
+            ["id", "type", "name", "displayName", "status"],
+            ["ID", "Type", "Name", "Display Name", "Status"],
+            ["fs-old", "Application", "Legacy ERP", "Legacy ERP", "ACTIVE"],
+            ["fs-new", "Application", "New ERP", "New ERP", "ACTIVE"],
+        ],
+    )
+    # The generic ``successorRelation`` form with from = older, to = newer.
+    _write_sheet(
+        wb,
+        "successorRelation",
+        [
+            [
+                "id",
+                "type",
+                "fromRelatedFactSheetDisplayName",
+                "fromRelatedFactSheetType",
+                "toRelatedFactSheetDisplayName",
+                "toRelatedFactSheetType",
+                "status",
+            ],
+            ["ID", "Type", "From", "From Type", "To", "To Type", "Status"],
+            [
+                "rel-1",
+                "successorRelation",
+                "Legacy ERP",
+                "Application",
+                "New ERP",
+                "Application",
+                "ACTIVE",
+            ],
+        ],
+    )
+    snap = parse_xlsx(_to_stream(wb))
+    # The row must have been promoted to the type-specific form so the
+    # downstream LX_TO_TEA_RELATION mapping can catch it.
+    rels = [r for r in snap.relations if "uccessor" in r.type]
+    assert len(rels) == 1
+    assert rels[0].type == "applicationSuccessorRelation"
+    # Direction is preserved at parse time — the staging-layer flip is
+    # what actually swaps source/target. Parser stays direction-neutral.
+    assert rels[0].source_id == "fs-old"
+    assert rels[0].target_id == "fs-new"
+
+
+def test_generic_successor_relation_with_mixed_endpoints_left_alone() -> None:
+    """Successor rows whose endpoints disagree on FS type are invalid in
+    LeanIX. The parser leaves them as plain ``successorRelation`` so the
+    staging layer flags them as conflicts for the admin to inspect rather
+    than silently routing them to the wrong TEA edge."""
+    wb = Workbook()
+    _write_sheet(
+        wb,
+        "Application",
+        [
+            ["id", "type", "name", "displayName", "status"],
+            ["ID", "Type", "Name", "Display Name", "Status"],
+            ["fs-app", "Application", "App", "App", "ACTIVE"],
+        ],
+    )
+    _write_sheet(
+        wb,
+        "ITComponent",
+        [
+            ["id", "type", "name", "displayName", "status"],
+            ["ID", "Type", "Name", "Display Name", "Status"],
+            ["fs-itc", "ITComponent", "ITC", "ITC", "ACTIVE"],
+        ],
+    )
+    _write_sheet(
+        wb,
+        "successorRelation",
+        [
+            [
+                "id",
+                "type",
+                "fromRelatedFactSheetDisplayName",
+                "fromRelatedFactSheetType",
+                "toRelatedFactSheetDisplayName",
+                "toRelatedFactSheetType",
+                "status",
+            ],
+            ["ID", "Type", "From", "From Type", "To", "To Type", "Status"],
+            [
+                "rel-mixed",
+                "successorRelation",
+                "App",
+                "Application",
+                "ITC",
+                "ITComponent",
+                "ACTIVE",
+            ],
+        ],
+    )
+    snap = parse_xlsx(_to_stream(wb))
+    mixed = [r for r in snap.relations if r.leanix_id == "rel-mixed"]
+    assert len(mixed) == 1
+    assert mixed[0].type == "successorRelation"  # untouched
+
+
 def test_parse_xlsx_path_loads_workbook_regardless_of_extension(tmp_path) -> None:
     """``parse_xlsx_path`` must load xlsx files even when the path has
     no ``.xlsx`` extension — uploaded snapshots are stored under a

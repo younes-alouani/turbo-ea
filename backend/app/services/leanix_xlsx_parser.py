@@ -550,6 +550,18 @@ def _build_relation(
     if not (from_name and from_type and to_name and to_type):
         raise _SkipRowError
 
+    # LeanIX exports two flavours of successor edges in the same workbook:
+    # type-prefixed (``applicationSuccessorRelation``) and the generic
+    # ``successorRelation`` — the latter relies on the row's
+    # ``fromRelatedFactSheetType`` to disambiguate which TEA edge it maps
+    # to. Rewrite the generic form to the prefixed form at parse time so
+    # the static ``LX_TO_TEA_RELATION`` map and the ``LX_FLIP_DIRECTION``
+    # set catch them just like the prefixed rows. Same treatment for the
+    # GraphQL ``relSuccessor`` equivalent. Mixed-type successor rows
+    # (extremely rare in LeanIX) are left untouched so they surface as
+    # admin-reviewable conflicts.
+    rel_type = _specialise_generic_successor(rel_type, from_type, to_type)
+
     src = _resolve_endpoint_id(from_name, from_type, display_index, errors, context=rel_type)
     tgt = _resolve_endpoint_id(to_name, to_type, display_index, errors, context=rel_type)
     if not (src and tgt):
@@ -712,6 +724,44 @@ def _resolve_endpoint_id(
     if leanix_id is None:
         errors.append(f"{context}: unresolved endpoint ({display_name!r}, {fs_type!r})")
     return leanix_id
+
+
+# LeanIX fact-sheet type names → camelCased prefix the type-specific
+# successor edge uses (``Application`` → ``application`` →
+# ``applicationSuccessorRelation``). The keys cover both LeanIX's
+# canonical names and the tenant aliases ``Project`` (folded into
+# Initiative downstream) and ``TechPlatform`` (folded into Platform);
+# the camelCased ``itComponent`` is preserved as-is.
+_SUCCESSOR_TYPE_PREFIX: dict[str, str] = {
+    "Application": "application",
+    "ITComponent": "itComponent",
+    "Interface": "interface",
+    "Initiative": "initiative",
+    "Project": "initiative",
+    "Platform": "platform",
+    "TechPlatform": "platform",
+    "BusinessProcess": "process",
+    "Process": "process",
+    "DataObject": "dataObject",
+}
+
+
+def _specialise_generic_successor(rel_type: str, from_type: str | None, to_type: str | None) -> str:
+    """Rewrite LeanIX's generic ``successorRelation`` / ``relSuccessor``
+    rows into the type-specific form (``applicationSuccessorRelation``
+    etc.) so the downstream mapping + direction-flip layers can route
+    them without a special case. Returns ``rel_type`` unchanged when the
+    row isn't a generic successor edge or when the endpoints have
+    different FS types (an invalid LeanIX shape we leave alone for the
+    admin to inspect)."""
+    if rel_type not in {"successorRelation", "relSuccessor"}:
+        return rel_type
+    if not from_type or from_type != to_type:
+        return rel_type
+    prefix = _SUCCESSOR_TYPE_PREFIX.get(from_type)
+    if not prefix:
+        return rel_type
+    return f"{prefix}SuccessorRelation"
 
 
 def _apply_child_parent_relations(
