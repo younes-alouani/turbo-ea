@@ -11162,6 +11162,21 @@
       },
       "UserCreate": {
         "properties": {
+          "auth_provider": {
+            "anyOf": [
+              {
+                "enum": [
+                  "local",
+                  "sso"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Provider"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"

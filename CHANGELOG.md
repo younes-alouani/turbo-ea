@@ -5,6 +5,13 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.25.1] - 2026-05-22
+
+### Fixed
+- **User import respects «send invites» checkbox.** Importing users via Admin → Users & Roles with the *send invites* box unchecked no longer flags the new accounts as **Invited** and no longer adds them to the pending invitations list — regardless of whether SSO is enabled. The role is stored on the user row, so SSO sign-in still picks up the right role on first login (#584).
+- **User import honours the `auth_provider` column without trafficking in passwords.** The user-import sheet's `auth_provider` column (`local` or `sso`) is now forwarded to the backend, so a row tagged «local» lands as a local account even in SSO-enabled tenants (and a row tagged «sso» lands as SSO regardless). The `password` column is **no longer accepted** from the sheet — local users are created with a single-use setup token, the invite email carries the `/auth/set-password` link, and the user picks their own password. Local rows without an invite email are rejected (the setup link has no channel to travel through). The import dialog flags any password column in the sheet with a clear warning (#584).
+- **Application Title applied on public pages.** The browser tab title now shows the admin-configured Application Title on every public route — Web Portals (`/portal/:slug`) and the public auth pages (set-password, forgot/reset-password, SSO callback) — instead of the static «Turbo EA» fallback. Title-sync was hoisted to the App root so the next public page someone adds inherits the same behaviour automatically (#590).
+
 ## [1.25.0] - 2026-05-22
 
 ### Added
