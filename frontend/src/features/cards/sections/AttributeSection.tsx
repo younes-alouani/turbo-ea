@@ -191,6 +191,42 @@ function AttributeSection({
             </Box>
           );
         }
+        // Multi-line text breaks out of the 180px label column to get full width.
+        if (item.field.type === "multiline_text") {
+          const isCalc = calculatedFieldKeys.includes(item.field.key);
+          const isReadOnly = item.field.readonly;
+          if (isEdit && !isReadOnly && !isCalc) {
+            return (
+              <Box key={item.field.key} sx={{ mb: 2.5 }}>
+                <FieldEditor
+                  field={item.field}
+                  value={attrs[item.field.key]}
+                  onChange={(v) => setAttr(item.field.key, v)}
+                  currencySymbol={symbol}
+                  canViewCosts={canViewCosts}
+                />
+              </Box>
+            );
+          }
+          return (
+            <Box key={item.field.key} sx={{ mb: 1.5 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                {rl(item.field.key, item.field.translations)}
+                {isCalc ? (
+                  <Chip component="span" size="small" label={t("attributes.calculated")} sx={{ height: 16, fontSize: "0.55rem", ml: 0.5, verticalAlign: "middle" }} />
+                ) : isReadOnly ? (
+                  <Chip component="span" size="small" label={t("attributes.auto")} sx={{ height: 16, fontSize: "0.55rem", ml: 0.5, verticalAlign: "middle" }} />
+                ) : null}
+              </Typography>
+              <FieldValue
+                field={item.field}
+                value={(isEdit ? attrs : card.attributes || {})[item.field.key]}
+                currencyFmt={fmt}
+                canViewCosts={canViewCosts}
+              />
+            </Box>
+          );
+        }
         return (
           <Box key={item.field.key} sx={{ mb: isEdit ? 2.5 : 0.5 }}>
             {isEdit ? renderEditFields([item.field]) : renderReadGrid([item.field])}
