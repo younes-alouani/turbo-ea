@@ -19,6 +19,7 @@ from tests.conftest import (
     create_card,
     create_card_type,
     create_role,
+    create_stakeholder_role_def,
     create_user,
 )
 
@@ -200,3 +201,121 @@ class TestAdminDashboardReport:
         assert len(body["oldest_overdue_todos"]) == 1
         overdue = body["oldest_overdue_todos"][0]
         assert overdue["assignee_name"] == env["bob"].display_name
+
+
+class TestStakeholderDirectory:
+    """`/reports/stakeholder-directory` powers the Admin tab's
+    Stakeholder directory widget — one round-trip returning the full
+    (card type → role → user → card_count) tree."""
+
+    @pytest.fixture
+    async def env(self, db):
+        await create_role(db, key="admin", permissions={"*": True})
+        await create_role(db, key="member", permissions=MEMBER_PERMISSIONS)
+        await create_card_type(db, key="Application", label="Application")
+        await create_card_type(db, key="BusinessProcess", label="Business Process")
+        await create_card_type(db, key="Hidden", label="Hidden", is_hidden=True)
+        await create_stakeholder_role_def(
+            db,
+            card_type_key="Application",
+            key="responsible",
+            label="Application Owner",
+            sort_order=0,
+        )
+        await create_stakeholder_role_def(
+            db,
+            card_type_key="Application",
+            key="observer",
+            label="Observer",
+            sort_order=1,
+        )
+        await create_stakeholder_role_def(
+            db,
+            card_type_key="BusinessProcess",
+            key="responsible",
+            label="Process Owner",
+            sort_order=0,
+        )
+        admin = await create_user(db, email="admin@test.com", role="admin")
+        alice = await create_user(db, email="alice@test.com", display_name="Alice", role="member")
+        bob = await create_user(db, email="bob@test.com", display_name="Bob", role="member")
+        return {"admin": admin, "alice": alice, "bob": bob}
+
+    async def test_requires_admin_users(self, client, db, env):
+        resp = await client.get(
+            "/api/v1/reports/stakeholder-directory", headers=auth_headers(env["alice"])
+        )
+        assert resp.status_code == 403
+
+    async def test_empty_tenant_returns_no_card_types(self, client, db, env):
+        # No cards / no stakeholders yet.
+        resp = await client.get(
+            "/api/v1/reports/stakeholder-directory", headers=auth_headers(env["admin"])
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"card_types": []}
+
+    async def test_full_tree(self, client, db, env):
+        # Alice owns two apps + observes one. Bob owns one app + one process.
+        a1 = await create_card(db, card_type="Application", name="A1", user_id=env["admin"].id)
+        a2 = await create_card(db, card_type="Application", name="A2", user_id=env["admin"].id)
+        a3 = await create_card(db, card_type="Application", name="A3", user_id=env["admin"].id)
+        p1 = await create_card(db, card_type="BusinessProcess", name="P1", user_id=env["admin"].id)
+        # Hidden card type should be excluded.
+        h1 = await create_card(db, card_type="Hidden", name="H1", user_id=env["admin"].id)
+
+        db.add_all(
+            [
+                Stakeholder(card_id=a1.id, user_id=env["alice"].id, role="responsible"),
+                Stakeholder(card_id=a2.id, user_id=env["alice"].id, role="responsible"),
+                Stakeholder(card_id=a3.id, user_id=env["alice"].id, role="observer"),
+                Stakeholder(card_id=a3.id, user_id=env["bob"].id, role="responsible"),
+                Stakeholder(card_id=p1.id, user_id=env["bob"].id, role="responsible"),
+                Stakeholder(card_id=h1.id, user_id=env["alice"].id, role="responsible"),
+            ]
+        )
+        await db.flush()
+
+        resp = await client.get(
+            "/api/v1/reports/stakeholder-directory", headers=auth_headers(env["admin"])
+        )
+        body = resp.json()
+        type_keys = [ct["type_key"] for ct in body["card_types"]]
+        # Hidden type filtered out.
+        assert "Hidden" not in type_keys
+        assert set(type_keys) == {"Application", "BusinessProcess"}
+
+        # Application card type: 3 holders worth of slots — Alice in two roles +
+        # Bob in one role — so unique-holders is 2.
+        app_node = next(c for c in body["card_types"] if c["type_key"] == "Application")
+        assert app_node["holders_count"] == 2
+        assert app_node["type_label"] == "Application"
+
+        # Roles ordered by SRD sort_order: responsible (0) before observer (1).
+        role_keys = [r["role_key"] for r in app_node["roles"]]
+        assert role_keys == ["responsible", "observer"]
+
+        responsible = app_node["roles"][0]
+        assert responsible["role_label"] == "Application Owner"
+        # Users ordered by card_count desc: Alice (2) before Bob (1).
+        names = [u["display_name"] for u in responsible["users"]]
+        assert names == ["Alice", "Bob"]
+        counts = [u["card_count"] for u in responsible["users"]]
+        assert counts == [2, 1]
+        # Each user now carries the actual cards inline (no follow-up fetch
+        # needed for the click-to-expand affordance in the directory widget).
+        alice_cards = {c["name"] for c in responsible["users"][0]["cards"]}
+        assert alice_cards == {"A1", "A2"}
+        bob_cards = {c["name"] for c in responsible["users"][1]["cards"]}
+        assert bob_cards == {"A3"}
+
+        observer = app_node["roles"][1]
+        observer_users = observer["users"]
+        assert len(observer_users) == 1
+        assert observer_users[0]["display_name"] == "Alice"
+        assert observer_users[0]["card_count"] == 1
+        assert [c["name"] for c in observer_users[0]["cards"]] == ["A3"]
+
+        # Card types ordered by holders_count desc — Application (2) before
+        # BusinessProcess (1).
+        assert type_keys == ["Application", "BusinessProcess"]

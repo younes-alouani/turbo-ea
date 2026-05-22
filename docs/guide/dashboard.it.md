@@ -41,3 +41,17 @@ Nella sezione inferiore della Dashboard troverete:
 - **Stato di approvazione**: Indica quante card sono approvate, in attesa, interrotte o rifiutate
 - **Qualità dei dati**: Percentuale complessiva di completezza delle informazioni su tutte le card
 - **Attività recente**: Un feed delle ultime modifiche — chi ha modificato cosa e quando
+
+## Scheda «Spazio di lavoro»
+
+La scheda **Spazio di lavoro** raccoglie tutto ciò che vi è assegnato: preferiti, attività, sondaggi in attesa, attività recente sulle vostre card e la sezione **Carte con il mio ruolo**.
+
+Quest'ultima raggruppa le card per il ruolo di stakeholder che ricoprite (Application Owner, Business Owner, ecc.) ed elenca le card sotto ciascun ruolo. Se il vostro ruolo concede l'autorizzazione `stakeholders.view` (admin, member e viewer per impostazione predefinita), accanto al titolo della sezione appare una piccola icona **person_search**: selezionate un utente dall'autocompletamento e la sezione si ricarica con i suoi ruoli e le sue card. Il titolo diventa «Ruoli ricoperti da {name}». Fate clic sulla piccola icona di chiusura per tornare ai vostri ruoli. Utile per rispondere a «cosa possiede questa persona?» con un clic.
+
+## Scheda «Amministrazione» — Directory degli stakeholder
+
+Gli amministratori (qualsiasi ruolo con `admin.users`) vedono un widget **Directory degli stakeholder** in fondo alla scheda Amministrazione. Elenca ogni tipo di scheda con almeno uno stakeholder, insieme al numero di titolari distinti. Espandete un tipo di scheda per vederne i ruoli e, all'interno di ogni ruolo, gli utenti con il numero di card che coprono. Fate clic su una chip utente per espandere la sua lista di card direttamente sotto — ogni nome di card è un link alla pagina di dettaglio. L'intero albero (tipo di scheda → ruolo → utente → card) viene restituito in un singolo round-trip, quindi la navigazione è immediata.
+
+Un **filtro per nome** in cima al widget restringe l'albero agli utenti che corrispondono al nome o all'email digitati; i tipi di scheda corrispondenti si espandono automaticamente affinché le corrispondenze siano visibili senza un clic in più. Pratico per rispondere a «dove appare Alice nell'organizzazione?» in un secondo.
+
+Oltre alla directory, un piccolo **popover al passaggio del mouse** si apre quando il cursore si sofferma su un nome di stakeholder altrove nell'applicazione — nella scheda Stakeholder di una card, su un proprietario di rischio nel Registro dei rischi o nella pagina di Dettaglio del rischio — mostrando il portafoglio completo di quella persona raggruppato per ruolo. Fate clic su una card nel popover per saltare ad essa. Il popover effettua il recupero solo una volta per utente per sessione.

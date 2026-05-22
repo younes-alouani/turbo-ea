@@ -41,3 +41,17 @@ Na seção inferior do Painel, você encontrará:
 - **Status de aprovação**: Indica quantos cards estão aprovados, pendentes, quebrados ou rejeitados
 - **Qualidade dos dados**: Porcentagem geral de completude das informações em todos os cards
 - **Atividade recente**: Um feed das últimas alterações — quem editou o quê e quando
+
+## Aba «Espaço de trabalho»
+
+A aba **Espaço de trabalho** reúne tudo o que está atribuído a você: favoritos, tarefas, pesquisas pendentes, atividade recente em seus cards e a seção **Cards com meu papel**.
+
+Esta última agrupa os cards pelo papel de parte interessada que você desempenha (Application Owner, Business Owner, etc.) e lista os cards sob cada papel. Se seu papel concede a permissão `stakeholders.view` (admin, member e viewer por padrão), um pequeno ícone **person_search** aparece ao lado do título da seção: selecione um usuário na autocompletação e a seção é recarregada com os papéis e cards dele. O título muda para «Funções desempenhadas por {name}». Clique no pequeno ícone de fechar para voltar aos seus próprios papéis. Útil para responder a «o que essa pessoa possui?» com um clique.
+
+## Aba «Administração» — Diretório de partes interessadas
+
+Administradores (qualquer função com `admin.users`) veem um widget **Diretório de partes interessadas** na parte inferior da aba Administração. Ele lista cada tipo de cartão com pelo menos uma parte interessada, junto com o número de titulares distintos. Expanda um tipo de cartão para ver suas funções e, dentro de cada função, os usuários com o número de cartões que cobrem. Clique em um chip de usuário para expandir sua lista de cartões logo abaixo — cada nome de cartão é um link para a página de detalhe. Toda a árvore (tipo de cartão → função → usuário → cartões) chega em uma única ida-e-volta, então a navegação é instantânea.
+
+Um **filtro por nome** no topo do widget restringe a árvore aos usuários que correspondem ao nome ou e-mail digitado; os tipos de cartão correspondentes se auto-expandem para que as correspondências fiquem visíveis sem um clique adicional. Útil para responder «onde Alice aparece na organização?» em um segundo.
+
+Além do diretório, um pequeno **popover de hover** abre sempre que o cursor pausa sobre o nome de uma parte interessada em outras partes do aplicativo — na aba Partes interessadas de um cartão, sobre um proprietário de risco no Registro de riscos ou na página de detalhe de risco — mostrando o portfólio completo daquela pessoa agrupado por função. Clique em qualquer cartão no popover para ir até ele. O popover só busca uma vez por usuário por sessão.

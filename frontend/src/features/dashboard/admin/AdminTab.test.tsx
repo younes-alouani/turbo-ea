@@ -11,6 +11,9 @@ vi.mock("./TopContributorsSection", () => ({
 vi.mock("./StakeholderCoverageSection", () => ({
   default: () => <div data-testid="coverage" />,
 }));
+vi.mock("./StakeholderDirectorySection", () => ({
+  default: () => <div data-testid="directory" />,
+}));
 vi.mock("./IdleUsersSection", () => ({
   default: ({ pendingSsoInvitations }: { pendingSsoInvitations: number }) => (
     <div data-testid="idle" data-sso={pendingSsoInvitations} />

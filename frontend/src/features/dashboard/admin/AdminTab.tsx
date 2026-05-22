@@ -9,6 +9,7 @@ import type { EventEntry } from "@/types";
 import MetricCard from "@/features/reports/MetricCard";
 import TopContributorsSection, { type ContributorRow } from "./TopContributorsSection";
 import StakeholderCoverageSection, { type CoverageRow } from "./StakeholderCoverageSection";
+import StakeholderDirectorySection from "./StakeholderDirectorySection";
 import IdleUsersSection, { type IdleUserRow } from "./IdleUsersSection";
 import ApprovalPipelineSection, { type PipelineRow } from "./ApprovalPipelineSection";
 import SystemActivitySection from "./SystemActivitySection";
@@ -165,6 +166,9 @@ export default function AdminTab() {
             unassignedCount={kpis.unassigned_todo_count}
             loading={loading}
           />
+        </Grid>
+        <Grid item xs={12}>
+          <StakeholderDirectorySection />
         </Grid>
       </Grid>
     </Box>
