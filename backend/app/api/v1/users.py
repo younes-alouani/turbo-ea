@@ -488,9 +488,9 @@ async def create_user(
             # password-setup link instead.
             raise HTTPException(
                 400,
-                "Local accounts without a password need an invitation email "
-                "to deliver the password-setup link. Tick «send invites» or "
-                "set a password.",
+                "Local accounts need an invitation email to deliver the "
+                "password-setup link. Tick «send invites» on the import "
+                "step and try again.",
             )
     elif body.auth_provider == "sso":
         auth_provider = "sso"
