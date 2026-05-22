@@ -47,3 +47,9 @@ Dans la section inférieure du tableau de bord, vous trouverez :
 L'onglet **Espace de travail** rassemble tout ce qui vous est assigné : favoris, tâches, sondages en attente, activité récente sur vos cartes et la section **Cartes où j'ai un rôle**.
 
 Cette dernière groupe les cartes par rôle de partie prenante que vous occupez (Application Owner, Business Owner, etc.) et liste les cartes sous chaque rôle. Si votre rôle accorde la permission `stakeholders.view` (admin, member et viewer par défaut), une petite icône **person_search** apparaît à côté du titre de la section : sélectionnez un utilisateur dans l'autocomplétion et la section se recharge avec ses rôles et ses cartes. Le titre devient «Rôles tenus par {name}». Cliquez sur la petite icône de fermeture pour revenir à vos propres rôles. Utile pour répondre à «que possède cette personne ?» en un clic.
+
+## Onglet «Administration» — Annuaire des parties prenantes
+
+Les administrateurs (tout rôle disposant de `admin.users`) voient un widget **Annuaire des parties prenantes** en bas de l'onglet Administration. Il liste chaque type de carte ayant au moins une partie prenante, avec le nombre de titulaires distincts. Dépliez un type de carte pour voir ses rôles, et dans chaque rôle les utilisateurs avec le nombre de cartes qu'ils couvrent. C'est la réponse à l'échelle de l'organisation à «qui est responsable de quoi ?», en un écran et un clic par type de carte.
+
+Les chips du widget sont **sensibles au survol** : placez le curseur sur un chip d'utilisateur dans l'annuaire — ou sur un nom de partie prenante dans l'onglet Parties prenantes d'une carte ou sur un propriétaire de risque dans le registre des risques / la page de détail d'un risque — et un petit popover s'ouvre avec le portefeuille complet de cette personne groupé par rôle. Cliquez sur une carte dans le popover pour y accéder directement. Le popover n'effectue qu'une seule récupération par utilisateur et par session.

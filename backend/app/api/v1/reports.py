@@ -21,6 +21,7 @@ from app.models.relation import Relation
 from app.models.relation_type import RelationType
 from app.models.sso_invitation import SsoInvitation
 from app.models.stakeholder import Stakeholder
+from app.models.stakeholder_role_definition import StakeholderRoleDefinition
 from app.models.survey import SurveyResponse
 from app.models.tag import CardTag, Tag, TagGroup
 from app.models.todo import Todo
@@ -601,6 +602,147 @@ async def admin_dashboard_summary(
         "recent_activity": recent_activity,
         "oldest_overdue_todos": oldest_overdue_todos,
     }
+
+
+@router.get("/stakeholder-directory")
+async def stakeholder_directory(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Org-wide stakeholder directory keyed by card type → role → users.
+
+    Powers the **Stakeholder directory** widget on the Admin tab. One
+    aggregating query group-bys over `(card.type, stakeholder.role,
+    stakeholder.user_id)` so the whole tree comes back in a single
+    round-trip. Per-user card lists are intentionally **not** included
+    here — drill-down uses the existing
+    ``GET /cards/my-stakeholder?user_id=X`` endpoint (cached on hover
+    in the UI), which keeps this payload small on big tenants.
+    """
+    await PermissionService.require_permission(db, user, "admin.users")
+
+    hidden_types_sq = select(CardType.key).where(CardType.is_hidden == True)  # noqa: E712
+
+    # Aggregate (type, role, user_id) → distinct card count.
+    rows = (
+        await db.execute(
+            select(
+                Card.type,
+                Stakeholder.role,
+                Stakeholder.user_id,
+                func.count(func.distinct(Card.id)).label("card_count"),
+            )
+            .join(Stakeholder, Stakeholder.card_id == Card.id)
+            .where(
+                Card.status == "ACTIVE",
+                Card.type.not_in(hidden_types_sq),
+            )
+            .group_by(Card.type, Stakeholder.role, Stakeholder.user_id)
+        )
+    ).all()
+
+    if not rows:
+        return {"card_types": []}
+
+    # Collect everything we need to resolve in bulk: card types, role defs,
+    # users. One round-trip each.
+    type_keys = {r[0] for r in rows}
+    user_ids = {r[2] for r in rows}
+
+    type_meta_rows = (
+        (await db.execute(select(CardType).where(CardType.key.in_(type_keys)))).scalars().all()
+    )
+    type_meta = {ct.key: ct for ct in type_meta_rows}
+
+    srd_rows = (
+        (
+            await db.execute(
+                select(StakeholderRoleDefinition).where(
+                    StakeholderRoleDefinition.card_type_key.in_(type_keys),
+                    StakeholderRoleDefinition.is_archived == False,  # noqa: E712
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    srd_map: dict[tuple[str, str], StakeholderRoleDefinition] = {
+        (s.card_type_key, s.key): s for s in srd_rows
+    }
+    srd_sort: dict[tuple[str, str], int] = {
+        (s.card_type_key, s.key): s.sort_order for s in srd_rows
+    }
+
+    user_rows = (await db.execute(select(User).where(User.id.in_(user_ids)))).scalars().all()
+    user_meta = {u.id: u for u in user_rows}
+
+    # Build nested tree: type → role → users.
+    by_type: dict[str, dict] = {}
+    type_total_holders: dict[str, set] = {}
+    for type_key, role_key, user_id, card_count in rows:
+        ct_node = by_type.setdefault(
+            type_key,
+            {
+                "type_key": type_key,
+                "type_label": None,
+                "type_icon": None,
+                "type_color": None,
+                "roles": {},
+            },
+        )
+        role_node = ct_node["roles"].setdefault(
+            role_key,
+            {
+                "role_key": role_key,
+                "role_label": role_key,
+                "role_color": "#757575",
+                "role_translations": {},
+                "users": [],
+            },
+        )
+        u = user_meta.get(user_id)
+        role_node["users"].append(
+            {
+                "user_id": str(user_id),
+                "display_name": (u.display_name if u else None) or (u.email if u else str(user_id)),
+                "email": u.email if u else None,
+                "card_count": int(card_count),
+            }
+        )
+        type_total_holders.setdefault(type_key, set()).add(user_id)
+
+    # Resolve type + role metadata and serialise into ordered lists.
+    out_card_types = []
+    for type_key, ct_node in by_type.items():
+        meta = type_meta.get(type_key)
+        ct_node["type_label"] = (meta.label if meta else type_key) or type_key
+        ct_node["type_icon"] = meta.icon if meta else "category"
+        ct_node["type_color"] = meta.color if meta else "#757575"
+
+        # Resolve role metadata + order roles by sort_order then role_key.
+        roles_list = []
+        for role_key, role_node in ct_node["roles"].items():
+            srd = srd_map.get((type_key, role_key))
+            if srd is not None:
+                role_node["role_label"] = srd.label
+                role_node["role_color"] = srd.color or "#757575"
+                role_node["role_translations"] = srd.translations or {}
+            # Order users within each role by card_count desc, then name.
+            role_node["users"].sort(
+                key=lambda u: (-u["card_count"], (u["display_name"] or "").lower())
+            )
+            roles_list.append(role_node)
+        roles_list.sort(
+            key=lambda r: (srd_sort.get((type_key, r["role_key"]), 9999), r["role_key"])
+        )
+        ct_node["roles"] = roles_list
+        ct_node["holders_count"] = len(type_total_holders.get(type_key, set()))
+        out_card_types.append(ct_node)
+
+    # Order card types by total holders desc, then label.
+    out_card_types.sort(key=lambda c: (-c["holders_count"], (c["type_label"] or "").lower()))
+
+    return {"card_types": out_card_types}
 
 
 @router.get("/landscape")

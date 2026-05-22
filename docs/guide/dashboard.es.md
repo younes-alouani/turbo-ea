@@ -47,3 +47,9 @@ En la parte inferior del Panel de Control encontrará:
 La pestaña **Espacio de trabajo** reúne todo lo que se le ha asignado: favoritos, tareas, encuestas pendientes, actividad reciente en sus tarjetas y la sección **Tarjetas en las que tengo un rol**.
 
 Esta última agrupa las tarjetas por el rol de parte interesada que ejerce (Application Owner, Business Owner, etc.) y lista las tarjetas bajo cada rol. Si su rol concede el permiso `stakeholders.view` (admin, member y viewer de forma predeterminada), aparece un pequeño icono **person_search** junto al título de la sección: elija un usuario en el autocompletado y la sección se recarga con sus roles y tarjetas. El título cambia a «Roles de {name}». Pulse el pequeño icono de cierre para volver a sus propios roles. Útil para responder a «¿qué posee esta persona?» con un clic.
+
+## Pestaña «Administración» — Directorio de partes interesadas
+
+Los administradores (cualquier rol con `admin.users`) ven un widget **Directorio de partes interesadas** en la parte inferior de la pestaña Administración. Enumera cada tipo de tarjeta con al menos una parte interesada, junto con el número de titulares distintos. Expanda un tipo de tarjeta para ver sus roles, y dentro de cada rol los usuarios con el número de tarjetas que cubren. Es la respuesta a nivel de organización a «¿quién es responsable de qué?», en una sola pantalla y un clic por tipo de tarjeta.
+
+Las chips del widget son **sensibles al hover**: detenga el cursor sobre cualquier chip de usuario en el directorio — o sobre el nombre de una parte interesada en la pestaña Partes interesadas de una tarjeta, o sobre un propietario de riesgo en el Registro de riesgos o en la página de Detalle del riesgo — y se abrirá un pequeño popover con la cartera completa de esa persona agrupada por rol. Haga clic en cualquier tarjeta del popover para saltar a ella. El popover solo realiza la búsqueda una vez por usuario por sesión.

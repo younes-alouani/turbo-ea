@@ -33,6 +33,7 @@ import Stepper from "@mui/material/Stepper";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import MaterialSymbol from "@/components/MaterialSymbol";
+import StakeholderHoverCard from "@/components/StakeholderHoverCard";
 import { api, ApiError } from "@/api/client";
 import type {
   Risk,
@@ -521,6 +522,30 @@ export default function RiskDetailPage() {
               )}
               sx={{ maxWidth: 420 }}
             />
+            {risk.owner_id &&
+              (() => {
+                const owner = users.find((u) => u.id === risk.owner_id);
+                if (!owner) return null;
+                return (
+                  <Box sx={{ mt: 0.5, ml: 0.5 }}>
+                    <StakeholderHoverCard
+                      userId={owner.id}
+                      userName={owner.display_name}
+                    >
+                      <Chip
+                        size="small"
+                        icon={<MaterialSymbol icon="account_circle" size={14} />}
+                        label={owner.display_name}
+                        sx={{
+                          height: 22,
+                          fontSize: "0.7rem",
+                          cursor: "default",
+                        }}
+                      />
+                    </StakeholderHoverCard>
+                  </Box>
+                );
+              })()}
 
             <Box sx={{ mt: 1 }}>
               <Typography

@@ -15,6 +15,7 @@ import MuiCard from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import { useTranslation } from "react-i18next";
 import MaterialSymbol from "@/components/MaterialSymbol";
+import StakeholderHoverCard from "@/components/StakeholderHoverCard";
 import { useResolveLabel } from "@/hooks/useResolveLabel";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/api/client";
@@ -216,12 +217,18 @@ function StakeholdersTab({
                     }
                   >
                     <MaterialSymbol icon="person" size={20} />
-                    <ListItemText
-                      primary={s.user_display_name || s.user_email}
-                      secondary={s.user_display_name ? s.user_email : undefined}
-                      sx={{ ml: 1 }}
-                      slotProps={{ secondary: { sx: { fontSize: "0.75rem" } } }}
-                    />
+                    <StakeholderHoverCard
+                      userId={s.user_id}
+                      userName={s.user_display_name || s.user_email}
+                      display="block"
+                    >
+                      <ListItemText
+                        primary={s.user_display_name || s.user_email}
+                        secondary={s.user_display_name ? s.user_email : undefined}
+                        sx={{ ml: 1 }}
+                        slotProps={{ secondary: { sx: { fontSize: "0.75rem" } } }}
+                      />
+                    </StakeholderHoverCard>
                   </ListItem>
                 ))}
               </List>

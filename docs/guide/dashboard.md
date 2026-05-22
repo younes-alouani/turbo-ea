@@ -47,3 +47,9 @@ In the bottom section of the Dashboard you will find:
 The **Workspace** tab pulls together everything assigned to you: favorites, todos, pending surveys, recent activity on your cards, and the **Cards I Have a Role In** section.
 
 That last section groups cards by the stakeholder role you hold (Application Owner, Business Owner, etc.) and lists the cards under each. If your role grants the `stakeholders.view` permission (admin, member and viewer roles by default), a small **person search** icon next to the section title lets you point it at **someone else** — pick a user from the autocomplete and the section refetches and re-renders with that user's roles and cards. The section title flips to "Roles held by {name}". Click the small close icon to return to your own roles. Useful for answering "what does this person own?" in one click.
+
+## Admin tab — Stakeholder directory
+
+Administrators (any role with `admin.users`) get a **Stakeholder directory** widget at the bottom of the Admin tab. It lists every card type that has at least one stakeholder, with the count of distinct holders for each. Expand a card type to see its roles, and inside each role the users who hold it together with the number of cards they cover. This is the org-wide answer to "who is responsible for what?", in one screen and one click per card type.
+
+The widget chips are **hover-aware**: pause the cursor on any user chip in the directory — or on a stakeholder name in a card's Stakeholders tab, or on a risk owner in the Risk Register / Risk Detail page — and a small popover opens showing that user's full role-grouped stakeholder portfolio. Click any card in the popover to jump straight to it. The popover only fetches once per user per session.

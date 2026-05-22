@@ -47,3 +47,9 @@ Nella sezione inferiore della Dashboard troverete:
 La scheda **Spazio di lavoro** raccoglie tutto ciò che vi è assegnato: preferiti, attività, sondaggi in attesa, attività recente sulle vostre card e la sezione **Carte con il mio ruolo**.
 
 Quest'ultima raggruppa le card per il ruolo di stakeholder che ricoprite (Application Owner, Business Owner, ecc.) ed elenca le card sotto ciascun ruolo. Se il vostro ruolo concede l'autorizzazione `stakeholders.view` (admin, member e viewer per impostazione predefinita), accanto al titolo della sezione appare una piccola icona **person_search**: selezionate un utente dall'autocompletamento e la sezione si ricarica con i suoi ruoli e le sue card. Il titolo diventa «Ruoli ricoperti da {name}». Fate clic sulla piccola icona di chiusura per tornare ai vostri ruoli. Utile per rispondere a «cosa possiede questa persona?» con un clic.
+
+## Scheda «Amministrazione» — Directory degli stakeholder
+
+Gli amministratori (qualsiasi ruolo con `admin.users`) vedono un widget **Directory degli stakeholder** in fondo alla scheda Amministrazione. Elenca ogni tipo di scheda con almeno uno stakeholder, insieme al numero di titolari distinti. Espandete un tipo di scheda per vedere i suoi ruoli, e all'interno di ogni ruolo gli utenti con il numero di card che coprono. È la risposta a livello di organizzazione a «chi è responsabile di cosa?», in una sola schermata e con un clic per tipo di scheda.
+
+Le chip del widget sono **sensibili al passaggio del mouse**: lasciate il cursore su una chip utente nella directory — o su un nome di stakeholder nella scheda Stakeholder di una card o su un proprietario di rischio nel Registro dei rischi / nella pagina di Dettaglio del rischio — e si aprirà un piccolo popover con il portafoglio completo di quella persona raggruppato per ruolo. Fate clic su una card nel popover per saltare direttamente ad essa. Il popover effettua il recupero solo una volta per utente per sessione.

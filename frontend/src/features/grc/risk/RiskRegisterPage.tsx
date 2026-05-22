@@ -30,6 +30,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import MaterialSymbol from "@/components/MaterialSymbol";
+import StakeholderHoverCard from "@/components/StakeholderHoverCard";
 import MetricCard from "@/features/reports/MetricCard";
 import { api, ApiError } from "@/api/client";
 import type {
@@ -427,6 +428,16 @@ export default function RiskRegisterPage() {
         width: 160,
         filter: "agTextColumnFilter",
         valueFormatter: (p) => p.value ?? "—",
+        cellRenderer: (p: { data?: Risk; value?: string | null }) => {
+          const ownerId = p.data?.owner_id;
+          const ownerName = p.value ?? "—";
+          if (!ownerId) return ownerName;
+          return (
+            <StakeholderHoverCard userId={ownerId} userName={ownerName}>
+              <span>{ownerName}</span>
+            </StakeholderHoverCard>
+          );
+        },
       },
       {
         field: "target_resolution_date",

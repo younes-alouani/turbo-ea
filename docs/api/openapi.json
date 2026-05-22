@@ -23797,6 +23797,26 @@
         ]
       }
     },
+    "/api/v1/reports/stakeholder-directory": {
+      "get": {
+        "description": "Org-wide stakeholder directory keyed by card type \u2192 role \u2192 users.\n\nPowers the **Stakeholder directory** widget on the Admin tab. One\naggregating query group-bys over `(card.type, stakeholder.role,\nstakeholder.user_id)` so the whole tree comes back in a single\nround-trip. Per-user card lists are intentionally **not** included\nhere \u2014 drill-down uses the existing\n``GET /cards/my-stakeholder?user_id=X`` endpoint (cached on hover\nin the UI), which keeps this payload small on big tenants.",
+        "operationId": "stakeholder_directory_api_v1_reports_stakeholder_directory_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stakeholder Directory",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/risks": {
       "get": {
         "description": "Paginated, filterable risk list. ``status`` / ``category`` /\n``level`` / ``source_type`` are repeatable query params (e.g.\n``?status=identified&status=analysed``).",

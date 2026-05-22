@@ -47,3 +47,9 @@ Im unteren Bereich des Dashboards finden Sie:
 Der Tab **Arbeitsbereich** bündelt alles, was Ihnen zugewiesen ist: Favoriten, Aufgaben, ausstehende Umfragen, jüngste Aktivitäten auf Ihren Karten und den Abschnitt **Karten mit meiner Rolle**.
 
 Letzterer gruppiert Karten nach der Stakeholder-Rolle, die Sie innehaben (Application Owner, Business Owner usw.), und listet die Karten unter jeder Rolle auf. Wenn Ihre Rolle die Berechtigung `stakeholders.view` umfasst (standardmäßig Admin, Member und Viewer), erscheint ein kleines **Personensuche**-Symbol neben dem Abschnittstitel: Wählen Sie damit einen anderen Benutzer aus der Autovervollständigung, und der Abschnitt wird mit dessen Rollen und Karten neu geladen. Der Titel ändert sich zu «Rollen von {name}». Mit dem kleinen Schließen-Symbol kehren Sie zu Ihren eigenen Rollen zurück. Praktisch für die Frage «Wem gehört was?» mit einem Klick.
+
+## Admin-Tab — Stakeholder-Verzeichnis
+
+Administratoren (jede Rolle mit `admin.users`) sehen am unteren Rand des Admin-Tabs ein Widget **Stakeholder-Verzeichnis**. Es listet jeden Kartentyp mit mindestens einem Stakeholder auf, jeweils mit der Anzahl der eindeutigen Inhaber. Klappen Sie einen Kartentyp auf, um seine Rollen zu sehen, und innerhalb jeder Rolle die Benutzer mit der Anzahl ihrer Karten. Das ist die organisationsweite Antwort auf «Wer ist wofür verantwortlich?», in einer Ansicht und mit einem Klick pro Kartentyp.
+
+Die Chips im Widget sind **hover-fähig**: Bewegen Sie den Mauszeiger über einen Benutzer-Chip im Verzeichnis — oder über einen Stakeholder-Namen im Stakeholder-Tab einer Karte oder über einen Risikoeigentümer im Risikoregister bzw. auf der Risiko-Detailseite — und es öffnet sich ein kleines Popover mit dem vollständigen rollenbasierten Stakeholder-Portfolio. Klicken Sie auf eine Karte im Popover, um direkt zu ihr zu springen. Das Popover ruft pro Benutzer und Sitzung nur einmal die Daten ab.
