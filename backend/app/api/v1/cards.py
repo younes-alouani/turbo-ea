@@ -934,13 +934,14 @@ async def bulk_create_cards(
             ppm_excl = await _get_ppm_exclusions(db, card)
             await run_calculations_for_card(db, card, exclude_fields=ppm_excl)
 
-            await event_bus.publish(
-                "card.created",
-                {"id": str(card.id), "type": card.type, "name": card.name},
-                db=db,
-                card_id=card.id,
-                user_id=user.id,
-            )
+            if not body.dry_run:
+                await event_bus.publish(
+                    "card.created",
+                    {"id": str(card.id), "type": card.type, "name": card.name},
+                    db=db,
+                    card_id=card.id,
+                    user_id=user.id,
+                )
 
             # Index this freshly-created card so subsequent rows can reference
             # it as a parent (under both its full path and bare-name keys).
@@ -972,13 +973,24 @@ async def bulk_create_cards(
     created_count = sum(1 for r in results if r.status == "created")
     failed_count = sum(1 for r in results if r.status == "failed")
 
-    if failed_count > 0 and created_count == 0:
+    if body.dry_run:
+        # Preview-only mode: every validator and resolver has already run,
+        # but the agent expects to confirm before persisting. Discard the
+        # in-flight inserts so the agent sees the would-be outcome without
+        # touching the inventory.
+        await db.rollback()
+    elif failed_count > 0 and created_count == 0:
         # Nothing succeeded — roll back so we don't half-apply.
         await db.rollback()
     else:
         await db.commit()
 
-    return CardBulkCreateResponse(results=results, created=created_count, failed=failed_count)
+    return CardBulkCreateResponse(
+        results=results,
+        created=created_count,
+        failed=failed_count,
+        dry_run=body.dry_run,
+    )
 
 
 @router.post("/resolve-refs", response_model=CardRefResolveResponse)

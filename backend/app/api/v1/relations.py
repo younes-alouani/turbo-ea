@@ -578,21 +578,31 @@ async def bulk_relations(
             await run_calculations_for_card(db, card)
 
     # Emit all events after the writes settle so listeners see consistent
-    # state if they query back.
-    for event_type, rel, source_card, target_card, extra in events_to_emit:
-        await _emit_relation_events(
-            db,
-            event_type=event_type,
-            rel=rel,
-            source_card=source_card,
-            target_card=target_card,
-            actor_id=user.id,
-            extra=extra,
-        )
+    # state if they query back. Skipped in dry-run mode — nothing was
+    # persisted, so listeners must not be told it was.
+    if not body.dry_run:
+        for event_type, rel, source_card, target_card, extra in events_to_emit:
+            await _emit_relation_events(
+                db,
+                event_type=event_type,
+                rel=rel,
+                source_card=source_card,
+                target_card=target_card,
+                actor_id=user.id,
+                extra=extra,
+            )
 
-    if failed > 0 and upserted == 0 and deleted == 0:
+    if body.dry_run:
+        await db.rollback()
+    elif failed > 0 and upserted == 0 and deleted == 0:
         await db.rollback()
     else:
         await db.commit()
 
-    return RelationBulkResponse(results=results, upserted=upserted, deleted=deleted, failed=failed)
+    return RelationBulkResponse(
+        results=results,
+        upserted=upserted,
+        deleted=deleted,
+        failed=failed,
+        dry_run=body.dry_run,
+    )

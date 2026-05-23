@@ -179,17 +179,29 @@ async def save_diagram(
                 )
             )
 
-    # Publish event
-    await event_bus.publish(
-        "process_diagram.saved",
-        {"process_name": process.name, "version": new_version, "element_count": len(extracted)},
-        db=db,
-        card_id=pid,
-        user_id=current_user.id,
-    )
+    # Publish event — skipped in dry-run mode since nothing is persisted.
+    if not body.dry_run:
+        await event_bus.publish(
+            "process_diagram.saved",
+            {
+                "process_name": process.name,
+                "version": new_version,
+                "element_count": len(extracted),
+            },
+            db=db,
+            card_id=pid,
+            user_id=current_user.id,
+        )
 
-    await db.commit()
-    return {"version": new_version, "element_count": len(extracted)}
+    if body.dry_run:
+        await db.rollback()
+    else:
+        await db.commit()
+    return {
+        "version": new_version,
+        "element_count": len(extracted),
+        "dry_run": body.dry_run,
+    }
 
 
 @router.delete("/processes/{process_id}/diagram")

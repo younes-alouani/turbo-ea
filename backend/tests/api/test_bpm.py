@@ -5,7 +5,10 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from sqlalchemy import select
 
+from app.models.process_diagram import ProcessDiagram
+from app.models.process_element import ProcessElement
 from tests.conftest import (
     auth_headers,
     create_card,
@@ -214,3 +217,82 @@ class TestProcessAssessments:
             headers=auth_headers(admin),
         )
         assert resp.status_code == 404
+
+
+_MINIMAL_BPMN = """<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  id="Defs" targetNamespace="http://example.com/bpmn">
+  <bpmn:process id="P1" isExecutable="true">
+    <bpmn:startEvent id="Start1" name="Start" />
+    <bpmn:task id="T1" name="Pick item" />
+    <bpmn:endEvent id="End1" name="Done" />
+  </bpmn:process>
+</bpmn:definitions>
+"""
+
+
+class TestSaveDiagramDryRun:
+    """Dry-run path used by the MCP `import_bpmn` tool."""
+
+    async def test_dry_run_parses_but_does_not_persist(self, client, db, bpm_env):
+        admin = bpm_env["admin"]
+        process = bpm_env["process"]
+        resp = await client.put(
+            f"/api/v1/bpm/processes/{process.id}/diagram",
+            json={"bpmn_xml": _MINIMAL_BPMN, "dry_run": True},
+            headers=auth_headers(admin),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["dry_run"] is True
+        # The parser ran and extracted elements.
+        assert body["element_count"] >= 1
+        # …but nothing persisted.
+        diagrams = (
+            (
+                await db.execute(
+                    select(ProcessDiagram).where(ProcessDiagram.process_id == process.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        elements = (
+            (
+                await db.execute(
+                    select(ProcessElement).where(ProcessElement.process_id == process.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert diagrams == []
+        assert elements == []
+
+    async def test_commit_persists_after_dry_run(self, client, db, bpm_env):
+        admin = bpm_env["admin"]
+        process = bpm_env["process"]
+        # Dry-run first.
+        await client.put(
+            f"/api/v1/bpm/processes/{process.id}/diagram",
+            json={"bpmn_xml": _MINIMAL_BPMN, "dry_run": True},
+            headers=auth_headers(admin),
+        )
+        # Then commit.
+        resp = await client.put(
+            f"/api/v1/bpm/processes/{process.id}/diagram",
+            json={"bpmn_xml": _MINIMAL_BPMN, "dry_run": False},
+            headers=auth_headers(admin),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["dry_run"] is False
+        rows = (
+            (
+                await db.execute(
+                    select(ProcessDiagram).where(ProcessDiagram.process_id == process.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(rows) == 1

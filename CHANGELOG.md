@@ -5,6 +5,14 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.27.0] - 2026-05-23
+
+### Added
+- **MCP artifact upload.** The MCP server now ships five write tools so AI agents can turn artifacts they have in context (spreadsheets, BPMN XML, DrawIO XML, freeform documents, images) into Turbo EA cards, relations and diagrams: `create_cards_bulk`, `resolve_card_refs`, `upsert_relations_bulk`, `create_diagram`, and `import_bpmn` (find-or-create the BusinessProcess card, then save the BPMN diagram). Every write tool defaults to `dry_run=True` — the backend runs every validator and resolver, then rolls back so the agent can show the user a preview before committing. Permissions are enforced server-side via the existing JWT pass-through (`inventory.create`, `relations.manage`, `diagrams.manage`, `bpm.edit`).
+
+### Changed
+- `POST /cards/bulk-create`, `POST /relations/bulk`, and `PUT /bpm/processes/{id}/diagram` accept an optional `dry_run: bool = false` field; when true, the handler validates and reports the would-be outcome, then rolls back. Event-bus publishes are gated on `not dry_run`.
+
 ## [1.26.2] - 2026-05-23
 
 ### Fixed

@@ -1,4 +1,4 @@
-"""Turbo EA MCP Server — provides read-only AI tool access to EA data.
+"""Turbo EA MCP Server — provides AI tool access to EA data.
 
 Run: python -m turbo_ea_mcp.server --host 0.0.0.0 --port 8001
 """
@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import textwrap
 from urllib.parse import urlparse
 
@@ -62,9 +63,20 @@ mcp = FastMCP(
     "Turbo EA",
     instructions=textwrap.dedent("""\
         Turbo EA is an Enterprise Architecture management platform.
-        Use the available tools to query the IT landscape data.
+        Use the read tools (search_cards, get_card, list_card_types, …) to
+        query the IT landscape and the write tools (create_cards_bulk,
+        upsert_relations_bulk, create_diagram, import_bpmn, resolve_card_refs)
+        to turn artifacts the user has shared with you (spreadsheets, BPMN
+        XML, DrawIO XML, documents) into cards, relations and diagrams.
+
+        Write tools default to dry_run=True: they validate and return a
+        preview without persisting. Surface the preview to the user, then
+        call again with dry_run=False to commit. Always call list_card_types
+        and get_relation_types first to make sure the data you propose fits
+        the existing metamodel — the backend will reject unknown types and
+        invalid source/target combinations.
+
         All data access respects the authenticated user's permissions.
-        Data is read-only — you cannot create or modify cards.
     """),
     transport_security=_build_transport_security(),
 )
@@ -602,6 +614,352 @@ async def get_card_documents(card_id: str) -> str:
     client = TurboEAClient(token)
     data = await client.get(f"/cards/{card_id}/documents")
     return _fmt(data)
+
+
+# ── Write tools (artifact import) ───────────────────────────────────────────
+#
+# These tools turn artifacts the calling agent has parsed (Excel rows, BPMN
+# XML, DrawIO XML, structured data extracted from documents) into cards,
+# relations and diagrams. They default to dry_run=True so the agent can show
+# the user a preview before persisting.
+
+
+# Regex mirror of `_CARD_ID_RE` in backend/app/api/v1/diagrams.py — used to
+# preview which existing cards a DrawIO XML payload would link.
+_DRAWIO_CARD_ID_RE = re.compile(r'cardId="([0-9a-fA-F-]{36})"')
+
+
+@mcp.tool()
+async def create_cards_bulk(cards: list[dict], dry_run: bool = True) -> str:
+    """Create many cards in one call from artifact-extracted rows.
+
+    The calling agent is expected to read the source artifact (spreadsheet,
+    document, image) itself, extract structured rows, and call this tool.
+    Use list_card_types first to learn which `type` keys and `attributes`
+    fit the metamodel — unknown types are rejected by the backend.
+
+    Args:
+        cards: List of row dicts. Each dict mirrors `CardBulkCreateItem`:
+            - `row_index` (int, required): a stable index so the response
+              can be paired back to the source row.
+            - `type` (str, required): card type key (e.g. "Application",
+              "BusinessCapability"). Must exist in the metamodel.
+            - `name` (str, required): human-readable name.
+            - `subtype` (str, optional): subtype key from the type's
+              `subtypes` list.
+            - `description` (str, optional).
+            - `parent_id` (UUID string, optional): existing parent UUID.
+            - `parent_name` + `parent_path` (str + list[str], optional):
+              reference an existing or same-batch parent by name. The
+              backend topologically sorts so a parent row earlier in the
+              batch can be referenced by a child row later in the batch.
+            - `attributes` (dict, optional): metamodel fields keyed by field
+              key. Unknown keys are accepted (stored as JSONB) but won't
+              show in the UI — match the type's `fields_schema`.
+            - `lifecycle` (dict, optional): `{phase, start_date, end_date}`.
+            - `external_id`, `alias`, `approval_status` (str, optional).
+            Single-row imports work too — pass a 1-item list.
+        dry_run: When True (default), validate every row and return the
+            preview without persisting. The agent should show the result
+            to the user and only call again with dry_run=False to commit.
+
+    Returns: JSON with `results[]` (per-row status/id/error), `created`,
+    `failed`, and `dry_run`.
+    """
+    token = await _get_current_token()
+    if not token:
+        return "Error: Not authenticated. Please reconnect."
+    client = TurboEAClient(token)
+    data = await client.post(
+        "/cards/bulk-create",
+        json={"cards": cards, "dry_run": dry_run},
+    )
+    return _fmt(data)
+
+
+@mcp.tool()
+async def resolve_card_refs(refs: list[dict]) -> str:
+    """Pre-validate name-based card references before a bulk import.
+
+    Useful when the artifact references existing cards by name (parent
+    chains in spreadsheets, source/target columns in a relation sheet)
+    and the agent wants to surface ambiguous or missing refs to the user
+    before committing.
+
+    Args:
+        refs: List of reference dicts. Each dict mirrors `CardRefInput`:
+            - `row` (int): source row.
+            - `column` (str): source column label.
+            - `type` (str): the expected card type for the lookup.
+            - `ref` (str): the human-typed reference. A simple name
+              ("NexaCore ERP") or a `/`-separated path
+              ("Sales / Customer Mgmt / CRM").
+
+    Returns: JSON with one result per ref — `resolved` (with `id`),
+    `ambiguous` (with up to 3 `candidates`), or `missing`.
+    """
+    token = await _get_current_token()
+    if not token:
+        return "Error: Not authenticated. Please reconnect."
+    client = TurboEAClient(token)
+    data = await client.post("/cards/resolve-refs", json={"refs": refs})
+    return _fmt(data)
+
+
+@mcp.tool()
+async def upsert_relations_bulk(
+    operations: list[dict],
+    dry_run: bool = True,
+) -> str:
+    """Create or delete many relations between cards in one call.
+
+    Call get_relation_types first to see which relation type keys exist
+    and which source/target card types each one connects — the backend
+    rejects relations whose source or target types don't match the
+    metamodel definition.
+
+    Args:
+        operations: List of operation dicts. Each dict mirrors
+            `RelationBulkOperation`:
+            - `row_index` (int): stable source row index.
+            - `action` (str, optional): "upsert" (default) or "delete".
+            - `type` (str): relation type key (e.g. "uses",
+              "implementedBy"). Must exist in the metamodel.
+            - `source` (dict): either `{"id": "<uuid>"}` or
+              `{"type": "...", "name": "...", "parent_path": [...]}`.
+            - `target` (dict): same shape as `source`.
+            - `attributes` (dict, optional).
+            - `description` (str, optional).
+        dry_run: When True (default), validate every op and return the
+            preview without persisting. Call again with dry_run=False to
+            commit.
+
+    Returns: JSON with `results[]`, `upserted`, `deleted`, `failed` and
+    `dry_run`.
+    """
+    token = await _get_current_token()
+    if not token:
+        return "Error: Not authenticated. Please reconnect."
+    client = TurboEAClient(token)
+    data = await client.post(
+        "/relations/bulk",
+        json={"operations": operations, "dry_run": dry_run},
+    )
+    return _fmt(data)
+
+
+@mcp.tool()
+async def create_diagram(
+    name: str,
+    drawio_xml: str,
+    description: str = "",
+    linked_card_ids: list[str] | None = None,
+    dry_run: bool = True,
+) -> str:
+    """Create a free-form DrawIO diagram, optionally linked to cards.
+
+    The agent is expected to provide complete DrawIO XML. Card references
+    embedded as `cardId="<uuid>"` attributes on `<object>` elements are
+    extracted by the backend and surface as visual links from the diagram
+    to those cards; `linked_card_ids` separately drives the
+    "what diagrams reference this card?" lookup. Pass both when both
+    apply (typical: agent already added the cardId attributes inside the
+    XML and lists the same UUIDs in linked_card_ids).
+
+    Args:
+        name: Diagram name.
+        drawio_xml: DrawIO mxGraph XML.
+        description: Optional description.
+        linked_card_ids: Optional list of card UUIDs to link to this
+            diagram (M:N).
+        dry_run: When True (default), validate client-side (scan the XML
+            for cardId refs, echo the inputs) without calling the backend.
+            Call again with dry_run=False to actually create the diagram.
+
+    Returns: JSON with either the dry-run preview (extracted_card_refs
+    from the XML, linked_card_ids echoed back) or the created diagram.
+    """
+    token = await _get_current_token()
+    if not token:
+        return "Error: Not authenticated. Please reconnect."
+    linked_card_ids = list(linked_card_ids or [])
+    extracted_refs = list(dict.fromkeys(_DRAWIO_CARD_ID_RE.findall(drawio_xml)))
+    if dry_run:
+        # Client-side preview only — no backend round-trip. The agent
+        # surfaces this to the user; on confirmation, we'll commit.
+        preview = {
+            "dry_run": True,
+            "would_create": {
+                "name": name,
+                "description": description,
+                "type": "free_draw",
+                "linked_card_ids": linked_card_ids,
+                "extracted_card_refs_from_xml": extracted_refs,
+            },
+            "note": (
+                "Card IDs are not verified in dry-run mode; the backend "
+                "will reject unknown UUIDs on commit. Re-run with "
+                "dry_run=False to create the diagram."
+            ),
+        }
+        return _fmt(preview)
+    client = TurboEAClient(token)
+    payload: dict = {
+        "name": name,
+        "description": description or None,
+        "type": "free_draw",
+        "data": {"xml": drawio_xml},
+        "card_ids": linked_card_ids,
+    }
+    data = await client.post("/diagrams", json=payload)
+    return _fmt(data)
+
+
+@mcp.tool()
+async def import_bpmn(
+    business_process_name: str,
+    bpmn_xml: str,
+    parent_card: str | None = None,
+    svg_thumbnail: str = "",
+    dry_run: bool = True,
+) -> str:
+    """Save a BPMN 2.0 diagram against a BusinessProcess card.
+
+    Finds the matching `BusinessProcess` card by name (resolving by the
+    name search endpoint). If no card matches the name, this tool creates
+    one in the same call (using `business_process_name` as the card name
+    and `parent_card` as the optional parent reference). If multiple
+    cards match, the tool refuses to write and lists the candidates —
+    the agent should re-call with `parent_card` to disambiguate.
+
+    The backend parses the BPMN XML, extracts tasks/events/gateways/lanes
+    and stores them as ProcessElement rows linked to the BusinessProcess
+    card. Element-to-card links (Application/DataObject/ITComponent) are
+    a separate later step the user does in the BPM editor.
+
+    Args:
+        business_process_name: Card name to find or create.
+        bpmn_xml: BPMN 2.0 XML.
+        parent_card: Optional parent BusinessProcess card name to
+            disambiguate against (or to use as parent when creating).
+        svg_thumbnail: Optional SVG snapshot of the diagram.
+        dry_run: When True (default), validate every step without
+            persisting. When the BusinessProcess card doesn't exist yet,
+            the dry-run previews the would-be card creation but skips the
+            diagram save step (no card_id to attach against in a
+            rolled-back transaction). Call again with dry_run=False to
+            commit.
+    """
+    token = await _get_current_token()
+    if not token:
+        return "Error: Not authenticated. Please reconnect."
+    client = TurboEAClient(token)
+
+    # Step 1: find an existing BusinessProcess card by name.
+    search = await client.get(
+        "/cards",
+        params={
+            "type": "BusinessProcess",
+            "search": business_process_name,
+            "page_size": 25,
+        },
+    )
+    candidates = search.get("items", []) if isinstance(search, dict) else []
+    exact = [
+        c for c in candidates if c.get("name", "").strip() == business_process_name.strip()
+    ]
+    if len(exact) > 1:
+        # Multi-match: refuse to write. The agent must qualify.
+        return _fmt(
+            {
+                "error": "ambiguous_business_process",
+                "message": (
+                    f"Multiple BusinessProcess cards match '{business_process_name}'. "
+                    "Re-call with `parent_card` to disambiguate."
+                ),
+                "candidates": [
+                    {"id": c.get("id"), "name": c.get("name"), "parent_id": c.get("parent_id")}
+                    for c in exact
+                ],
+            }
+        )
+
+    create_card_result: dict | None = None
+    process_id: str | None = exact[0].get("id") if exact else None
+
+    if process_id is None:
+        # Step 2: create the BusinessProcess card.
+        bulk_payload = {
+            "cards": [
+                {
+                    "row_index": 0,
+                    "type": "BusinessProcess",
+                    "name": business_process_name,
+                    **(
+                        {"parent_name": parent_card, "parent_path": []}
+                        if parent_card
+                        else {}
+                    ),
+                }
+            ],
+            "dry_run": dry_run,
+        }
+        create_card_result = await client.post("/cards/bulk-create", json=bulk_payload)
+        results = (
+            create_card_result.get("results", [])
+            if isinstance(create_card_result, dict)
+            else []
+        )
+        if not results or results[0].get("status") != "created":
+            return _fmt(
+                {
+                    "error": "business_process_create_failed",
+                    "create_card_result": create_card_result,
+                }
+            )
+        # In dry-run mode the card was rolled back — we have no real id to
+        # use for step 3. Report the preview and ask the agent to commit.
+        if dry_run:
+            return _fmt(
+                {
+                    "dry_run": True,
+                    "would_create_business_process": True,
+                    "business_process_name": business_process_name,
+                    "parent_card": parent_card,
+                    "create_card_result": create_card_result,
+                    "note": (
+                        "BusinessProcess card does not exist yet. The BPMN "
+                        "diagram parse + save step is skipped in dry-run "
+                        "because there is no card_id to attach against. "
+                        "Re-run with dry_run=False to create the card and "
+                        "save the diagram in one call."
+                    ),
+                }
+            )
+        process_id = results[0].get("id")
+
+    if not process_id:
+        return _fmt({"error": "no_process_id", "create_card_result": create_card_result})
+
+    # Step 3: save the BPMN diagram against the process card.
+    diagram_payload = {
+        "bpmn_xml": bpmn_xml,
+        "svg_thumbnail": svg_thumbnail or None,
+        "dry_run": dry_run,
+    }
+    diagram_result = await client.put(
+        f"/bpm/processes/{process_id}/diagram",
+        json=diagram_payload,
+    )
+    return _fmt(
+        {
+            "dry_run": dry_run,
+            "business_process_id": process_id,
+            "business_process_created": create_card_result is not None,
+            "create_card_result": create_card_result,
+            "diagram_result": diagram_result,
+        }
+    )
 
 
 # ── Resources ───────────────────────────────────────────────────────────────

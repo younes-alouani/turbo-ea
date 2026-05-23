@@ -1495,6 +1495,11 @@
             "minItems": 1,
             "title": "Cards",
             "type": "array"
+          },
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1508,6 +1513,11 @@
           "created": {
             "title": "Created",
             "type": "integer"
+          },
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
           },
           "failed": {
             "title": "Failed",
@@ -3569,6 +3579,11 @@
           "bpmn_xml": {
             "title": "Bpmn Xml",
             "type": "string"
+          },
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
           },
           "svg_thumbnail": {
             "anyOf": [
@@ -7951,6 +7966,11 @@
       },
       "RelationBulkRequest": {
         "properties": {
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
           "operations": {
             "items": {
               "$ref": "#/components/schemas/RelationBulkOperation"
@@ -7972,6 +7992,11 @@
           "deleted": {
             "title": "Deleted",
             "type": "integer"
+          },
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
           },
           "failed": {
             "title": "Failed",

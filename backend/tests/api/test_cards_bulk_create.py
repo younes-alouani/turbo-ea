@@ -106,6 +106,68 @@ async def test_bulk_create_viewer_forbidden(client, db, bulk_env):
     assert resp.status_code == 403
 
 
+async def test_bulk_create_dry_run_validates_without_persisting(client, db, bulk_env):
+    """Used by the MCP `create_cards_bulk` tool to preview before commit:
+    every validator and resolver runs, but the transaction is rolled back
+    so the inventory stays untouched."""
+    admin = bulk_env["admin"]
+    payload = {
+        "cards": [
+            {"row_index": 1, "type": "Application", "name": "PreviewApp"},
+            {
+                "row_index": 2,
+                "type": "Application",
+                "name": "PreviewChild",
+                "parent_name": "PreviewApp",
+            },
+        ],
+        "dry_run": True,
+    }
+    resp = await client.post("/api/v1/cards/bulk-create", json=payload, headers=auth_headers(admin))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["dry_run"] is True
+    assert body["created"] == 2  # would-be-created
+    assert body["failed"] == 0
+    # No rows persisted — listing Application cards returns nothing of ours.
+    list_resp = await client.get(
+        "/api/v1/cards", params={"type": "Application"}, headers=auth_headers(admin)
+    )
+    names = [c["name"] for c in list_resp.json().get("items", [])]
+    assert "PreviewApp" not in names
+    assert "PreviewChild" not in names
+
+
+async def test_bulk_create_dry_run_then_commit(client, db, bulk_env):
+    """Same payload, dry-run first then commit: rows only appear after commit."""
+    admin = bulk_env["admin"]
+    payload_rows = [
+        {"row_index": 1, "type": "Application", "name": "TwoPhaseApp"},
+    ]
+    # 1. Dry-run.
+    preview = await client.post(
+        "/api/v1/cards/bulk-create",
+        json={"cards": payload_rows, "dry_run": True},
+        headers=auth_headers(admin),
+    )
+    assert preview.json()["dry_run"] is True
+    list_resp = await client.get(
+        "/api/v1/cards", params={"type": "Application"}, headers=auth_headers(admin)
+    )
+    assert "TwoPhaseApp" not in [c["name"] for c in list_resp.json().get("items", [])]
+    # 2. Commit.
+    commit = await client.post(
+        "/api/v1/cards/bulk-create",
+        json={"cards": payload_rows, "dry_run": False},
+        headers=auth_headers(admin),
+    )
+    assert commit.json()["created"] == 1
+    list_resp = await client.get(
+        "/api/v1/cards", params={"type": "Application"}, headers=auth_headers(admin)
+    )
+    assert "TwoPhaseApp" in [c["name"] for c in list_resp.json().get("items", [])]
+
+
 async def test_resolve_refs_resolved_and_ambiguous_and_missing(client, db, bulk_env):
     admin = bulk_env["admin"]
     nexa = await create_card(db, card_type="Organization", name="NexaTech", user_id=admin.id)

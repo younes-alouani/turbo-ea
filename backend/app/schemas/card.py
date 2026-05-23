@@ -359,6 +359,12 @@ class CardBulkCreateItem(BaseModel):
 
 class CardBulkCreateRequest(BaseModel):
     cards: list[CardBulkCreateItem] = Field(..., min_length=1, max_length=2000)
+    # When true, run every validator and resolver exactly as a real create,
+    # then roll the transaction back instead of committing. Side-effect
+    # emitters (event_bus, downstream sync) are also skipped. Used by the
+    # MCP server's `create_cards_bulk` tool to surface a preview before the
+    # agent confirms the write.
+    dry_run: bool = False
 
 
 class CardBulkCreateResult(BaseModel):
@@ -374,6 +380,7 @@ class CardBulkCreateResponse(BaseModel):
     results: list[CardBulkCreateResult]
     created: int
     failed: int
+    dry_run: bool = False
 
 
 class CardRefInput(BaseModel):
