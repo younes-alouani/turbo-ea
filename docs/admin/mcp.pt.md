@@ -247,6 +247,25 @@ Fluxo típico quando um usuário compartilha uma planilha com o agente de IA:
 4. O usuário confirma; o agente chama novamente com `dry_run=False` para confirmar.
 5. Se houver colunas de relação, o agente chama em seguida `upsert_relations_bulk` com o mesmo ciclo execução simulada / confirmação.
 
+### Salvaguardas das ferramentas de escrita
+
+Defesa em profundidade além da execução simulada, para que um descuido do LLM não possa causar danos em massa:
+
+- **Limite de tamanho por chamada.** As ferramentas de escrita MCP aplicam um limite muito menor que os endpoints subjacentes do importador Excel: 200 linhas para `create_cards_bulk`, 500 operações para `upsert_relations_bulk`. Grande o suficiente para qualquer carregamento realista de um único artefato, pequeno o suficiente para que uma prévia de execução simulada permaneça revisável.
+- **Sem exclusão de relações por padrão.** `upsert_relations_bulk` recusa operações `action: "delete"` — para remover relações, use a interface web onde a ação é registrada sob a identidade do usuário. Operadores podem habilitar definindo `MCP_ALLOW_RELATION_DELETE=true`.
+- **Interruptor de desligamento.** `MCP_WRITES_ENABLED=false` desliga todas as cinco ferramentas de escrita sem reimplantar código. As 25 ferramentas de leitura continuam funcionando.
+- **Marcador de origem para auditoria.** Cada requisição backend do servidor MCP carrega um cabeçalho `X-Turbo-EA-Origin: mcp`. Eventos emitidos dessas requisições são marcados com `origin: "mcp"` no payload do log de auditoria, de forma que administradores possam filtrar gravações dirigidas por MCP fora da linha do tempo, separadas das ações da interface web.
+- **Sem ferramentas de destruição em massa.** O conjunto de ferramentas omite deliberadamente a exclusão, arquivamento e atualização em massa de cards. Adicionar qualquer uma dessas ferramentas exigiria uma revisão de projeto explícita.
+
+As quatro variáveis de ambiente de salvaguarda no container MCP:
+
+| Variável | Padrão | Efeito |
+|----------|--------|--------|
+| `MCP_WRITES_ENABLED` | `true` | Interruptor principal das ferramentas de escrita. `false` → MCP somente leitura. |
+| `MCP_MAX_CARDS_PER_CALL` | `200` | Limite rígido de linhas `create_cards_bulk` por requisição. |
+| `MCP_MAX_RELATIONS_PER_CALL` | `500` | Limite rígido de operações `upsert_relations_bulk` por requisição. |
+| `MCP_ALLOW_RELATION_DELETE` | `false` | Quando `true`, `upsert_relations_bulk` aceita operações `action: "delete"`. |
+
 ### Recursos
 
 | URI | Descrição |

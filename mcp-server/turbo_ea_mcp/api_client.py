@@ -15,7 +15,13 @@ class TurboEAClient:
         self._base = TURBO_EA_URL.rstrip("/") + "/api/v1"
 
     def _headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self._token}"}
+        # `X-Turbo-EA-Origin` lets the backend tag emitted events with
+        # ``origin: "mcp"`` so admins can filter MCP-driven writes out of
+        # the audit log separately from web-UI actions.
+        return {
+            "Authorization": f"Bearer {self._token}",
+            "X-Turbo-EA-Origin": "mcp",
+        }
 
     async def get(self, path: str, params: dict | None = None) -> dict | list:
         async with httpx.AsyncClient(timeout=30.0) as client:

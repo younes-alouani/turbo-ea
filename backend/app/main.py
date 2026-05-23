@@ -631,8 +631,37 @@ app.add_middleware(
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-Turbo-EA-Origin"],
 )
+
+
+# ── Request origin tracking ──
+# The MCP server sets `X-Turbo-EA-Origin: mcp` on every backend call so the
+# audit trail can distinguish AI-agent-driven writes from web-UI writes.
+# `event_bus.publish` reads this contextvar and stamps it into the event
+# payload. Unknown / absent header => no tag (keeps existing UI events clean).
+from app.services.event_bus import request_origin as _request_origin  # noqa: E402
+
+_ORIGIN_ALLOWED = {"mcp", "web", "api"}
+
+
+async def capture_request_origin(request, call_next):
+    """Middleware that mirrors the request's ``X-Turbo-EA-Origin`` header
+    into a contextvar consumed by ``event_bus.publish``. Exported for
+    re-use in the test app fixture so audit-tagging behaviour is covered
+    end-to-end."""
+    raw = request.headers.get("X-Turbo-EA-Origin", "").strip().lower()
+    # Whitelist accepted values so a misbehaving caller can't smuggle
+    # arbitrary strings into the audit log.
+    origin: str | None = raw if raw in _ORIGIN_ALLOWED else None
+    token = _request_origin.set(origin)
+    try:
+        return await call_next(request)
+    finally:
+        _request_origin.reset(token)
+
+
+app.middleware("http")(capture_request_origin)
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 

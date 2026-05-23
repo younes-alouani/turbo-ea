@@ -247,6 +247,25 @@ MCP 服务器提供 **30 个工具**，分为两组：**25 个读取工具** 用
 4. 用户确认后，代理再以 `dry_run=False` 调用一次以提交。
 5. 如果存在关系列，代理随后以相同的 演练 / 确认 循环调用 `upsert_relations_bulk`。
 
+### 写入工具防护栏
+
+在演练之上的纵深防御，以确保 LLM 失误不会造成大规模损害：
+
+- **每次调用的大小上限。** MCP 写入工具强制施加比底层 Excel 导入端点小得多的上限：`create_cards_bulk` 为 200 行，`upsert_relations_bulk` 为 500 次操作。足以应对任何实际的单一工件上传，又小到可以快速扫描演练预览。
+- **默认不允许删除关系。** `upsert_relations_bulk` 拒绝 `action: "delete"` 操作——若要删除关系，请使用 Web 界面，那里的操作会以用户身份被记录。运营者可通过设置 `MCP_ALLOW_RELATION_DELETE=true` 启用此功能。
+- **紧急开关。** `MCP_WRITES_ENABLED=false` 可在无需重新部署代码的情况下关闭所有五个写入工具。25 个读取工具继续工作。
+- **审计来源标记。** 来自 MCP 服务器的每个后端请求都携带 `X-Turbo-EA-Origin: mcp` 头。从这些请求发出的事件在审计日志载荷中被标记为 `origin: "mcp"`，以便管理员可以将 MCP 驱动的写入与 Web 界面操作分别从时间线中筛选出来。
+- **没有大规模破坏工具。** 工具集刻意省略了卡片删除、归档和批量更新。添加任何此类工具都需要进行明确的设计评审。
+
+MCP 容器上的四个防护栏环境变量：
+
+| 变量 | 默认 | 作用 |
+|------|------|------|
+| `MCP_WRITES_ENABLED` | `true` | 写入工具的总开关。`false` → 只读 MCP。 |
+| `MCP_MAX_CARDS_PER_CALL` | `200` | 每次请求 `create_cards_bulk` 行数的硬性上限。 |
+| `MCP_MAX_RELATIONS_PER_CALL` | `500` | 每次请求 `upsert_relations_bulk` 操作数的硬性上限。 |
+| `MCP_ALLOW_RELATION_DELETE` | `false` | 当为 `true` 时，`upsert_relations_bulk` 接受 `action: "delete"` 操作。 |
+
 ### 资源
 
 | URI | 描述 |

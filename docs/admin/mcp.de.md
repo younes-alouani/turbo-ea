@@ -247,6 +247,25 @@ Typischer Ablauf, wenn ein Benutzer dem KI-Agenten eine Tabelle freigibt:
 4. Der Benutzer bestätigt; der Agent ruft erneut mit `dry_run=False` auf, um zu übernehmen.
 5. Falls Beziehungsspalten vorhanden sind, ruft der Agent anschließend `upsert_relations_bulk` mit demselben Trockenlauf-/Bestätigungszyklus auf.
 
+### Schutzmechanismen für Schreib-Werkzeuge
+
+Verteidigung in der Tiefe zusätzlich zum Trockenlauf, damit ein Fehlverhalten des LLM keinen Massenschaden verursachen kann:
+
+- **Größenbegrenzung pro Aufruf.** Die MCP-Schreib-Werkzeuge erzwingen eine wesentlich kleinere Obergrenze als die zugrunde liegenden Excel-Import-Endpunkte: 200 Zeilen für `create_cards_bulk`, 500 Operationen für `upsert_relations_bulk`. Groß genug für jeden realistischen Einzel-Artefakt-Upload, klein genug, dass eine Trockenlauf-Vorschau überprüfbar bleibt.
+- **Standardmäßig keine Löschung von Beziehungen.** `upsert_relations_bulk` lehnt `action: "delete"`-Operationen ab — um Beziehungen zu entfernen, ist die Weboberfläche zu verwenden, wo die Aktion unter der Identität des Benutzers erfasst wird. Operatoren können dies aktivieren, indem sie `MCP_ALLOW_RELATION_DELETE=true` setzen.
+- **Notausschalter.** `MCP_WRITES_ENABLED=false` schaltet alle fünf Schreib-Werkzeuge aus, ohne dass Code neu bereitgestellt werden muss. Die 25 Lese-Werkzeuge funktionieren weiter.
+- **Audit-Herkunfts-Marker.** Jede Backend-Anfrage vom MCP-Server trägt einen `X-Turbo-EA-Origin: mcp`-Header. Ereignisse, die aus diesen Anfragen emittiert werden, werden im Audit-Log-Payload mit `origin: "mcp"` markiert, sodass Administratoren MCP-gesteuerte Schreibvorgänge getrennt von Web-UI-Aktionen aus der Zeitleiste filtern können.
+- **Keine Massenvernichtungs-Werkzeuge.** Die Werkzeugsammlung lässt bewusst Kartenlöschung, Archivierung und Massenaktualisierung weg. Das Hinzufügen eines solchen Werkzeugs würde eine explizite Designprüfung erfordern.
+
+Die vier Umgebungsvariablen für Schutzmechanismen auf dem MCP-Container:
+
+| Variable | Standard | Wirkung |
+|----------|----------|---------|
+| `MCP_WRITES_ENABLED` | `true` | Hauptschalter für Schreib-Werkzeuge. `false` → schreibgeschützter MCP. |
+| `MCP_MAX_CARDS_PER_CALL` | `200` | Harte Obergrenze für `create_cards_bulk`-Zeilen pro Anfrage. |
+| `MCP_MAX_RELATIONS_PER_CALL` | `500` | Harte Obergrenze für `upsert_relations_bulk`-Operationen pro Anfrage. |
+| `MCP_ALLOW_RELATION_DELETE` | `false` | Bei `true` akzeptiert `upsert_relations_bulk` `action: "delete"`-Operationen. |
+
 ### Ressourcen
 
 | URI | Beschreibung |

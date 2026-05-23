@@ -21,8 +21,12 @@ from turbo_ea_mcp import oauth
 from turbo_ea_mcp.api_client import TurboEAClient
 from turbo_ea_mcp.config import (
     APP_VERSION,
+    MCP_ALLOW_RELATION_DELETE,
+    MCP_MAX_CARDS_PER_CALL,
+    MCP_MAX_RELATIONS_PER_CALL,
     MCP_PORT,
     MCP_PUBLIC_URL,
+    MCP_WRITES_ENABLED,
     TURBO_EA_PUBLIC_URL,
 )
 
@@ -629,6 +633,25 @@ async def get_card_documents(card_id: str) -> str:
 _DRAWIO_CARD_ID_RE = re.compile(r'cardId="([0-9a-fA-F-]{36})"')
 
 
+def _writes_disabled_message() -> str | None:
+    """Return a user-facing error when MCP writes are disabled, else None.
+
+    The kill switch (`MCP_WRITES_ENABLED=false`) lets an operator put the
+    server into read-only mode without a code redeploy.
+    """
+    if MCP_WRITES_ENABLED:
+        return None
+    return _fmt(
+        {
+            "error": "writes_disabled",
+            "message": (
+                "MCP writes are disabled on this deployment "
+                "(MCP_WRITES_ENABLED=false). Read tools remain available."
+            ),
+        }
+    )
+
+
 @mcp.tool()
 async def create_cards_bulk(cards: list[dict], dry_run: bool = True) -> str:
     """Create many cards in one call from artifact-extracted rows.
@@ -669,6 +692,21 @@ async def create_cards_bulk(cards: list[dict], dry_run: bool = True) -> str:
     token = await _get_current_token()
     if not token:
         return "Error: Not authenticated. Please reconnect."
+    if (disabled := _writes_disabled_message()) is not None:
+        return disabled
+    if len(cards) > MCP_MAX_CARDS_PER_CALL:
+        return _fmt(
+            {
+                "error": "batch_too_large",
+                "message": (
+                    f"This batch has {len(cards)} cards but the MCP per-call "
+                    f"cap is {MCP_MAX_CARDS_PER_CALL}. Split the upload into "
+                    "smaller batches so the user can review each dry-run."
+                ),
+                "cap": MCP_MAX_CARDS_PER_CALL,
+                "received": len(cards),
+            }
+        )
     client = TurboEAClient(token)
     data = await client.post(
         "/cards/bulk-create",
@@ -740,6 +778,38 @@ async def upsert_relations_bulk(
     token = await _get_current_token()
     if not token:
         return "Error: Not authenticated. Please reconnect."
+    if (disabled := _writes_disabled_message()) is not None:
+        return disabled
+    if len(operations) > MCP_MAX_RELATIONS_PER_CALL:
+        return _fmt(
+            {
+                "error": "batch_too_large",
+                "message": (
+                    f"This batch has {len(operations)} relation operations "
+                    f"but the MCP per-call cap is {MCP_MAX_RELATIONS_PER_CALL}. "
+                    "Split into smaller batches."
+                ),
+                "cap": MCP_MAX_RELATIONS_PER_CALL,
+                "received": len(operations),
+            }
+        )
+    if not MCP_ALLOW_RELATION_DELETE:
+        delete_rows = [
+            op.get("row_index") for op in operations if op.get("action") == "delete"
+        ]
+        if delete_rows:
+            return _fmt(
+                {
+                    "error": "delete_action_disabled",
+                    "message": (
+                        "Relation deletion via MCP is disabled. Remove "
+                        "relations from the web UI for an explicit audit "
+                        "trail, or set MCP_ALLOW_RELATION_DELETE=true on the "
+                        "deployment if the operator wants to opt in."
+                    ),
+                    "rejected_rows": delete_rows,
+                }
+            )
     client = TurboEAClient(token)
     data = await client.post(
         "/relations/bulk",
@@ -782,6 +852,8 @@ async def create_diagram(
     token = await _get_current_token()
     if not token:
         return "Error: Not authenticated. Please reconnect."
+    if (disabled := _writes_disabled_message()) is not None:
+        return disabled
     linked_card_ids = list(linked_card_ids or [])
     extracted_refs = list(dict.fromkeys(_DRAWIO_CARD_ID_RE.findall(drawio_xml)))
     if dry_run:
@@ -853,6 +925,8 @@ async def import_bpmn(
     token = await _get_current_token()
     if not token:
         return "Error: Not authenticated. Please reconnect."
+    if (disabled := _writes_disabled_message()) is not None:
+        return disabled
     client = TurboEAClient(token)
 
     # Step 1: find an existing BusinessProcess card by name.

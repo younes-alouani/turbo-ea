@@ -247,6 +247,25 @@ Flusso tipico quando un utente condivide un foglio di calcolo con l'agente di IA
 4. L'utente conferma; l'agente richiama con `dry_run=False` per confermare.
 5. Se sono presenti colonne di relazione, l'agente chiama poi `upsert_relations_bulk` con lo stesso ciclo esecuzione di prova / conferma.
 
+### Salvaguardie degli strumenti di scrittura
+
+Difesa in profondità sopra l'esecuzione di prova, in modo che un errore del LLM non possa causare danni massicci:
+
+- **Limite di dimensione per chiamata.** Gli strumenti di scrittura MCP applicano un limite molto più piccolo rispetto agli endpoint sottostanti dell'importatore Excel: 200 righe per `create_cards_bulk`, 500 operazioni per `upsert_relations_bulk`. Sufficientemente grande per qualsiasi caricamento realistico di un singolo artefatto, sufficientemente piccolo perché un'anteprima di esecuzione di prova rimanga visionabile.
+- **Nessuna eliminazione di relazioni per impostazione predefinita.** `upsert_relations_bulk` rifiuta le operazioni `action: "delete"` — per rimuovere relazioni, utilizzare l'interfaccia web dove l'azione viene registrata sotto l'identità dell'utente. Gli operatori possono abilitarla impostando `MCP_ALLOW_RELATION_DELETE=true`.
+- **Interruttore di spegnimento.** `MCP_WRITES_ENABLED=false` disattiva tutti e cinque gli strumenti di scrittura senza ridistribuire codice. I 25 strumenti di lettura continuano a funzionare.
+- **Etichetta di origine per l'audit.** Ogni richiesta al backend dal server MCP porta un'intestazione `X-Turbo-EA-Origin: mcp`. Gli eventi emessi da queste richieste vengono etichettati con `origin: "mcp"` nel payload del log di audit, in modo che gli amministratori possano filtrare le scritture guidate da MCP fuori dalla timeline, separate dalle azioni dell'interfaccia web.
+- **Nessuno strumento di distruzione di massa.** Il set di strumenti omette deliberatamente l'eliminazione, l'archiviazione e l'aggiornamento di massa delle card. Aggiungere uno di questi strumenti richiederebbe una revisione di progettazione esplicita.
+
+Le quattro variabili di ambiente di salvaguardia sul container MCP:
+
+| Variabile | Predefinito | Effetto |
+|-----------|-------------|---------|
+| `MCP_WRITES_ENABLED` | `true` | Interruttore principale degli strumenti di scrittura. `false` → MCP in sola lettura. |
+| `MCP_MAX_CARDS_PER_CALL` | `200` | Limite massimo di righe `create_cards_bulk` per richiesta. |
+| `MCP_MAX_RELATIONS_PER_CALL` | `500` | Limite massimo di operazioni `upsert_relations_bulk` per richiesta. |
+| `MCP_ALLOW_RELATION_DELETE` | `false` | Quando `true`, `upsert_relations_bulk` accetta operazioni `action: "delete"`. |
+
 ### Risorse
 
 | URI | Descrizione |

@@ -197,7 +197,11 @@ class TestUpsertRelationsBulk:
         assert _parse(out)["upserted"] == 1
 
     @pytest.mark.asyncio
-    async def test_delete(self, fake_token):
+    async def test_delete(self, fake_token, monkeypatch):
+        # Delete is gated behind MCP_ALLOW_RELATION_DELETE; flip it on for
+        # this happy-path forwarding test (the guardrail rejection path
+        # has its own test).
+        monkeypatch.setattr(server, "MCP_ALLOW_RELATION_DELETE", True)
         patcher, mock = _patched_post(
             {
                 "results": [{"row_index": 0, "status": "deleted"}],
@@ -418,6 +422,137 @@ class TestImportBpmn:
 
 
 # ── Unauthenticated paths ──────────────────────────────────────────────────
+
+
+class TestGuardrails:
+    """Per-call caps, kill switch, delete rejection."""
+
+    @pytest.mark.asyncio
+    async def test_cards_batch_over_cap_rejected(self, fake_token, monkeypatch):
+        monkeypatch.setattr(server, "MCP_MAX_CARDS_PER_CALL", 3)
+        rows = [
+            {"row_index": i, "type": "Application", "name": f"A{i}"} for i in range(4)
+        ]
+        post_mock = AsyncMock()  # must not be called
+        with patch.object(server.TurboEAClient, "post", post_mock):
+            out = await server.create_cards_bulk(cards=rows)
+        post_mock.assert_not_called()
+        data = _parse(out)
+        assert data["error"] == "batch_too_large"
+        assert data["cap"] == 3
+        assert data["received"] == 4
+
+    @pytest.mark.asyncio
+    async def test_cards_batch_at_cap_passes(self, fake_token, monkeypatch):
+        monkeypatch.setattr(server, "MCP_MAX_CARDS_PER_CALL", 3)
+        rows = [
+            {"row_index": i, "type": "Application", "name": f"A{i}"} for i in range(3)
+        ]
+        patcher, mock = _patched_post({"results": [], "created": 0, "failed": 0})
+        with patcher:
+            await server.create_cards_bulk(cards=rows, dry_run=False)
+        mock.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_relations_batch_over_cap_rejected(self, fake_token, monkeypatch):
+        monkeypatch.setattr(server, "MCP_MAX_RELATIONS_PER_CALL", 1)
+        ops = [
+            {
+                "row_index": i,
+                "type": "uses",
+                "source": {"id": f"s{i}"},
+                "target": {"id": f"t{i}"},
+            }
+            for i in range(2)
+        ]
+        post_mock = AsyncMock()
+        with patch.object(server.TurboEAClient, "post", post_mock):
+            out = await server.upsert_relations_bulk(operations=ops)
+        post_mock.assert_not_called()
+        data = _parse(out)
+        assert data["error"] == "batch_too_large"
+
+    @pytest.mark.asyncio
+    async def test_relations_delete_action_rejected(self, fake_token, monkeypatch):
+        # MCP_ALLOW_RELATION_DELETE defaults to False — verify rejection.
+        monkeypatch.setattr(server, "MCP_ALLOW_RELATION_DELETE", False)
+        ops = [
+            {
+                "row_index": 0,
+                "type": "uses",
+                "source": {"id": "s"},
+                "target": {"id": "t"},
+            },
+            {
+                "row_index": 1,
+                "action": "delete",
+                "type": "uses",
+                "source": {"id": "s"},
+                "target": {"id": "t"},
+            },
+        ]
+        post_mock = AsyncMock()
+        with patch.object(server.TurboEAClient, "post", post_mock):
+            out = await server.upsert_relations_bulk(operations=ops)
+        post_mock.assert_not_called()
+        data = _parse(out)
+        assert data["error"] == "delete_action_disabled"
+        assert data["rejected_rows"] == [1]
+
+    @pytest.mark.asyncio
+    async def test_relations_delete_allowed_when_flag_on(
+        self, fake_token, monkeypatch
+    ):
+        monkeypatch.setattr(server, "MCP_ALLOW_RELATION_DELETE", True)
+        ops = [
+            {
+                "row_index": 0,
+                "action": "delete",
+                "type": "uses",
+                "source": {"id": "s"},
+                "target": {"id": "t"},
+            }
+        ]
+        patcher, mock = _patched_post(
+            {"results": [], "upserted": 0, "deleted": 1, "failed": 0}
+        )
+        with patcher:
+            await server.upsert_relations_bulk(operations=ops, dry_run=False)
+        mock.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_writes_disabled_blocks_all_write_tools(
+        self, fake_token, monkeypatch
+    ):
+        monkeypatch.setattr(server, "MCP_WRITES_ENABLED", False)
+        post_mock = AsyncMock()
+        put_mock = AsyncMock()
+        get_mock = AsyncMock()
+        with (
+            patch.object(server.TurboEAClient, "post", post_mock),
+            patch.object(server.TurboEAClient, "put", put_mock),
+            patch.object(server.TurboEAClient, "get", get_mock),
+        ):
+            for out in [
+                await server.create_cards_bulk(cards=[]),
+                await server.upsert_relations_bulk(operations=[]),
+                await server.create_diagram(name="X", drawio_xml="<x/>"),
+                await server.import_bpmn(
+                    business_process_name="X", bpmn_xml="<bpmn:definitions/>"
+                ),
+            ]:
+                assert _parse(out)["error"] == "writes_disabled"
+        post_mock.assert_not_called()
+        put_mock.assert_not_called()
+        get_mock.assert_not_called()
+
+    def test_origin_header_added_on_post(self):
+        from turbo_ea_mcp.api_client import TurboEAClient
+
+        client = TurboEAClient("test-token")
+        headers = client._headers()
+        assert headers["X-Turbo-EA-Origin"] == "mcp"
+        assert headers["Authorization"] == "Bearer test-token"
 
 
 class TestUnauthenticatedWrites:

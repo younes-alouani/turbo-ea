@@ -138,6 +138,57 @@ async def test_bulk_create_dry_run_validates_without_persisting(client, db, bulk
     assert "PreviewChild" not in names
 
 
+async def test_bulk_create_tags_mcp_origin_on_events(client, db, bulk_env):
+    """The `X-Turbo-EA-Origin: mcp` header from the MCP server flows
+    through to the audit log: `card.created` events carry `origin: "mcp"`
+    in their data payload so admins can filter the timeline."""
+    from sqlalchemy import select
+
+    from app.models.event import Event
+
+    admin = bulk_env["admin"]
+    payload = {"cards": [{"row_index": 1, "type": "Application", "name": "OriginApp"}]}
+    headers = {**auth_headers(admin), "X-Turbo-EA-Origin": "mcp"}
+    resp = await client.post("/api/v1/cards/bulk-create", json=payload, headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["created"] == 1
+    rows = (
+        (
+            await db.execute(
+                select(Event).where(Event.event_type == "card.created").order_by(Event.id.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert rows, "no card.created event recorded"
+    assert rows[0].data.get("origin") == "mcp"
+
+
+async def test_bulk_create_no_origin_when_header_absent(client, db, bulk_env):
+    """The audit log stays clean of origin tags for plain UI / API calls
+    so pre-existing rows are not retroactively rewritten."""
+    from sqlalchemy import select
+
+    from app.models.event import Event
+
+    admin = bulk_env["admin"]
+    payload = {"cards": [{"row_index": 1, "type": "Application", "name": "WebApp"}]}
+    resp = await client.post("/api/v1/cards/bulk-create", json=payload, headers=auth_headers(admin))
+    assert resp.status_code == 200
+    rows = (
+        (
+            await db.execute(
+                select(Event).where(Event.event_type == "card.created").order_by(Event.id.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert rows
+    assert "origin" not in rows[0].data
+
+
 async def test_bulk_create_dry_run_then_commit(client, db, bulk_env):
     """Same payload, dry-run first then commit: rows only appear after commit."""
     admin = bulk_env["admin"]

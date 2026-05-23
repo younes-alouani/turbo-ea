@@ -247,6 +247,25 @@ Typical workflow when a user shares a spreadsheet with the AI agent:
 4. The user confirms; the agent calls again with `dry_run=False` to commit.
 5. If relation columns are present, the agent then calls `upsert_relations_bulk` with the same dry-run / confirm cycle.
 
+### Write-tool guardrails
+
+Defense in depth on top of dry-run, so an LLM mishap can't cause mass damage:
+
+- **Per-call size caps.** The MCP write tools enforce a much smaller cap than the underlying Excel-importer endpoints: 200 rows for `create_cards_bulk`, 500 ops for `upsert_relations_bulk`. Big enough for any realistic single artifact upload, small enough that a dry-run preview is still scannable.
+- **No relation deletion by default.** `upsert_relations_bulk` refuses `action: "delete"` ops — to remove relations, use the web UI where the action is captured under the user's identity. Operators can opt in by setting `MCP_ALLOW_RELATION_DELETE=true`.
+- **Kill switch.** `MCP_WRITES_ENABLED=false` turns off all five write tools without redeploying code. The 25 read tools keep working.
+- **Audit origin tag.** Every backend request from the MCP server carries an `X-Turbo-EA-Origin: mcp` header. Events emitted from those requests are tagged `origin: "mcp"` in the audit-log payload, so admins can filter MCP-driven writes out of the timeline distinct from web-UI actions.
+- **No mass-destruction tools.** The toolset deliberately omits card delete, archive, and bulk-update. Adding any such tool would require an explicit design review.
+
+The four guardrail environment variables on the MCP container:
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `MCP_WRITES_ENABLED` | `true` | Master switch for write tools. `false` → read-only MCP. |
+| `MCP_MAX_CARDS_PER_CALL` | `200` | Hard cap on `create_cards_bulk` rows per request. |
+| `MCP_MAX_RELATIONS_PER_CALL` | `500` | Hard cap on `upsert_relations_bulk` operations per request. |
+| `MCP_ALLOW_RELATION_DELETE` | `false` | When `true`, `upsert_relations_bulk` accepts `action: "delete"` ops. |
+
 ### Resources
 
 | URI | Description |

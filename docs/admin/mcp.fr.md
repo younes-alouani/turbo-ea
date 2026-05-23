@@ -247,6 +247,25 @@ Flux typique lorsqu'un utilisateur partage un tableur avec l'agent d'IA :
 4. L'utilisateur confirme ; l'agent rappelle avec `dry_run=False` pour valider.
 5. Si des colonnes de relation sont présentes, l'agent appelle ensuite `upsert_relations_bulk` selon le même cycle exécution à blanc / confirmation.
 
+### Garde-fous des outils d'écriture
+
+Défense en profondeur en plus de l'exécution à blanc, afin qu'une mauvaise interprétation du LLM ne puisse pas causer de dommages massifs :
+
+- **Plafond de taille par appel.** Les outils d'écriture MCP appliquent un plafond beaucoup plus petit que les endpoints sous-jacents de l'importateur Excel : 200 lignes pour `create_cards_bulk`, 500 opérations pour `upsert_relations_bulk`. Suffisamment grand pour tout téléversement d'artefact unique réaliste, suffisamment petit pour qu'une prévisualisation d'exécution à blanc reste scannable.
+- **Pas de suppression de relation par défaut.** `upsert_relations_bulk` refuse les opérations `action: "delete"` — pour supprimer des relations, utilisez l'interface web où l'action est consignée sous l'identité de l'utilisateur. Les opérateurs peuvent activer cette possibilité en définissant `MCP_ALLOW_RELATION_DELETE=true`.
+- **Interrupteur d'arrêt.** `MCP_WRITES_ENABLED=false` désactive les cinq outils d'écriture sans redéployer de code. Les 25 outils de lecture continuent de fonctionner.
+- **Étiquette d'origine d'audit.** Chaque requête backend du serveur MCP transporte un en-tête `X-Turbo-EA-Origin: mcp`. Les événements émis depuis ces requêtes sont étiquetés `origin: "mcp"` dans le payload du journal d'audit, ce qui permet aux administrateurs de filtrer les écritures pilotées par MCP hors de la chronologie, séparément des actions de l'interface web.
+- **Pas d'outils de destruction massive.** L'ensemble d'outils omet délibérément la suppression de fiche, l'archivage et la mise à jour en masse. L'ajout d'un tel outil nécessiterait une revue de conception explicite.
+
+Les quatre variables d'environnement de garde-fou sur le conteneur MCP :
+
+| Variable | Défaut | Effet |
+|----------|--------|-------|
+| `MCP_WRITES_ENABLED` | `true` | Interrupteur principal des outils d'écriture. `false` → MCP en lecture seule. |
+| `MCP_MAX_CARDS_PER_CALL` | `200` | Plafond strict du nombre de lignes `create_cards_bulk` par requête. |
+| `MCP_MAX_RELATIONS_PER_CALL` | `500` | Plafond strict du nombre d'opérations `upsert_relations_bulk` par requête. |
+| `MCP_ALLOW_RELATION_DELETE` | `false` | Lorsque `true`, `upsert_relations_bulk` accepte les opérations `action: "delete"`. |
+
 ### Ressources
 
 | URI | Description |
