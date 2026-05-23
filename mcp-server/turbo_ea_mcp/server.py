@@ -1069,59 +1069,141 @@ async def import_bpmn(
     if not process_id:
         return _fmt({"error": "no_process_id", "create_card_result": create_card_result})
 
-    # Step 3: save the BPMN diagram against the process card.
-    diagram_payload = {
-        "bpmn_xml": bpmn_xml,
-        "svg_thumbnail": svg_thumbnail or None,
-        "dry_run": dry_run,
-    }
-    diagram_result = await client.put(
-        f"/bpm/processes/{process_id}/diagram",
-        json=diagram_payload,
+    # Step 3: persist the diagram via the flow-version workflow. The card
+    # detail's Process Flow tab reads from
+    #   GET /bpm/processes/{id}/flow/published
+    # not the legacy `/diagram` endpoint, so to land a renderable diagram
+    # we have to walk it through draft -> pending -> published. The
+    # approve step also extracts ProcessElement rows for EA cross-ref.
+    #
+    # Dry-run shortcut: the flow endpoints don't have a dry_run flag and
+    # we don't want to fake one. The card-create step above already
+    # validated the card path; for the flow side, we surface the parsed
+    # element count via a parser-free regex count of <bpmn:*Task /
+    # *Event / *Gateway> so the agent can show the user something useful.
+    if dry_run:
+        preview_node_count = len(
+            re.findall(
+                r"<\w+:(?:task|userTask|serviceTask|scriptTask|businessRuleTask|"
+                r"sendTask|receiveTask|manualTask|callActivity|subProcess|"
+                r"exclusiveGateway|parallelGateway|inclusiveGateway|"
+                r"eventBasedGateway|startEvent|endEvent|"
+                r"intermediateCatchEvent|intermediateThrowEvent|boundaryEvent)\b",
+                bpmn_xml,
+            )
+        )
+        response: dict = {
+            "dry_run": True,
+            "committed": False,
+            "business_process_id": process_id,
+            "business_process_created": False,
+            "create_card_result": create_card_result,
+            "diagram_preview": {
+                "flow_nodes_estimated": preview_node_count,
+                "bpmn_xml_bytes": len(bpmn_xml),
+            },
+            "next_action": (
+                "NOTHING HAS BEEN PERSISTED YET. Surface this preview to "
+                "the user; on their confirmation, re-call import_bpmn "
+                "with dry_run=False to create a draft, submit it, and "
+                "publish it as the active process flow."
+            ),
+        }
+        if ignored_inputs:
+            response["warning"] = (
+                f"BusinessProcess card '{business_process_name}' already "
+                f"exists; the following inputs would be ignored on commit: "
+                f"{', '.join(ignored_inputs)}. This tool never mutates "
+                "pre-existing cards."
+            )
+        return _fmt(response)
+
+    # --- Commit path: draft -> submit -> approve ---
+    draft = await client.post(
+        f"/bpm/processes/{process_id}/flow/drafts",
+        json={"bpmn_xml": bpmn_xml, "svg_thumbnail": svg_thumbnail or None},
     )
-    # `flow_nodes_extracted` counts tasks/gateways/events that land in the
-    # ProcessElement table for EA cross-referencing. It is INTENTIONALLY
-    # smaller than the total element count in the BPMN XML — sequence
-    # flows (edges), lanes, BPMNDI shapes, and Collaboration / Participant
-    # metadata are not extracted into rows, they live inside the saved
-    # `bpmn_xml` and round-trip verbatim. Use the `bpmn_xml_bytes` field
-    # on `diagram_result` to confirm the full XML was stored.
-    response: dict = {
-        "dry_run": dry_run,
-        "committed": not dry_run,
+    draft_id = draft.get("id") if isinstance(draft, dict) else None
+    if not draft_id:
+        return _fmt(
+            {
+                "error": "draft_create_failed",
+                "draft_response": draft,
+            }
+        )
+
+    workflow_state = "draft"
+    submit_result: dict | list | None = None
+    approve_result: dict | list | None = None
+    publish_warning: str | None = None
+    try:
+        submit_result = await client.post(
+            f"/bpm/processes/{process_id}/flow/versions/{draft_id}/submit",
+            json={},
+        )
+        workflow_state = "pending"
+        try:
+            approve_result = await client.post(
+                f"/bpm/processes/{process_id}/flow/versions/{draft_id}/approve",
+                json={},
+            )
+            workflow_state = "published"
+        except Exception as exc:  # noqa: BLE001 — surface verbatim
+            publish_warning = (
+                "Diagram submitted for approval but the user does not have "
+                "permission to publish it (requires the process_owner "
+                "stakeholder role, admin, or bpm_admin). The pending "
+                f"draft is visible at /cards/{process_id} under "
+                f"Process Flow → Drafts. Approve from there to publish. "
+                f"(Error: {exc})"
+            )
+    except Exception as exc:  # noqa: BLE001
+        publish_warning = (
+            "Draft created but could not be submitted for approval. "
+            f"It is editable at /cards/{process_id}. (Error: {exc})"
+        )
+
+    response = {
+        "dry_run": False,
+        "committed": True,
         "business_process_id": process_id,
         "business_process_created": create_card_result is not None,
         "create_card_result": create_card_result,
-        "diagram_result": diagram_result,
+        "workflow_state": workflow_state,
+        "draft_id": draft_id,
+        "submit_result": submit_result,
+        "approve_result": approve_result,
         "verify_urls": {
-            # GET this to retrieve the saved XML byte-for-byte and confirm
-            # the round-trip preserved Collaboration, Participants, lanes,
-            # BPMNDI, etc.
-            "raw_bpmn": f"/api/v1/bpm/processes/{process_id}/diagram",
-            # Open this in the browser to view the BusinessProcess card's
-            # Process Flow tab where bpmn-js renders the diagram.
+            # Reads what the editor reads — null until status=published.
+            "flow_published": f"/api/v1/bpm/processes/{process_id}/flow/published",
+            # GET this for the draft view (always available post-create).
+            "flow_draft": (
+                f"/api/v1/bpm/processes/{process_id}/flow/versions/{draft_id}"
+            ),
+            # Open in browser — Process Flow tab.
             "card_detail": f"/cards/{process_id}",
         },
         "rendering_note": (
-            "If the diagram does not render in the editor, the saved XML "
-            "is the source of truth — fetch verify_urls.raw_bpmn and "
-            "compare against the input. The backend stores BPMN XML "
-            "verbatim and never parses or rewrites the BPMNDI plane."
+            "The Process Flow tab in the card detail reads from the "
+            "/flow/published endpoint. If `workflow_state` is "
+            "'published' the diagram should render; if it's 'pending' "
+            "or 'draft', open the card and approve from the Drafts "
+            "sub-tab to make it the published flow."
         ),
     }
+    if publish_warning:
+        response["warning"] = publish_warning
     if ignored_inputs:
-        response["warning"] = (
+        existing_warning = response.get("warning", "")
+        carded_warning = (
             f"BusinessProcess card '{business_process_name}' already exists; "
             f"the following inputs were ignored (this tool never mutates "
-            f"pre-existing cards): {', '.join(ignored_inputs)}. To change "
-            "the existing card, edit it from the web UI."
+            f"pre-existing cards): {', '.join(ignored_inputs)}."
         )
-    if dry_run:
-        response["next_action"] = (
-            "NOTHING HAS BEEN PERSISTED YET. Surface this preview to the "
-            "user; on their confirmation, re-call import_bpmn with "
-            "dry_run=False to actually save the BPMN diagram against "
-            f"BusinessProcess id {process_id}."
+        response["warning"] = (
+            f"{existing_warning} {carded_warning}".strip()
+            if existing_warning
+            else carded_warning
         )
     return _fmt(response)
 
