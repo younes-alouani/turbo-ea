@@ -100,15 +100,15 @@ class StagedRecord(UUIDMixin, Base):
     entity_kind: Mapped[str] = mapped_column(String(30), nullable=False)
     # Real platform UUIDs are typically 36 chars but the staging code
     # synthesises composite keys for joins the source doesn't give us a
-    # stable id for (card_tag, subscription, comment) — those reach
-    # 100+ chars.
-    source_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    # stable id for (card_tag, subscription, comment, document) — those
+    # routinely exceed 255 chars on real snapshots, so this is TEXT.
+    source_id: Mapped[str] = mapped_column(Text, nullable=False)
     source_data: Mapped[dict | None] = mapped_column(JSONB, default=dict)
     card_type_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     action: Mapped[str] = mapped_column(String(20), default="create")
     diff: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    parent_source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    parent_source_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -141,7 +141,7 @@ class IdentityMap(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "migration_identity_map"
 
     source_type: Mapped[str] = mapped_column(String(20), default="leanix", nullable=False)
-    source_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_id: Mapped[str] = mapped_column(Text, nullable=False)
     entity_kind: Mapped[str] = mapped_column(String(30), nullable=False)
     target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     migration_id: Mapped[uuid.UUID | None] = mapped_column(

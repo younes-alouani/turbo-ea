@@ -5,6 +5,11 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.29.2] - 2026-05-25
+
+### Fixed
+- **LeanIX import no longer fails on large tenant exports.** Composite staging ids built from a fact sheet uuid plus a long role name, email, or document name (subscriptions, documents, tag groups) used to overflow the 255-char `source_id` column and abort the parse job with a `value too long for type character varying(255)` error. The migration staging tables now use `TEXT` columns, so any future source adapter (Ardoq, HOPEX, BiZZdesign, …) inherits the headroom without revisiting the schema. Fixes [#599](https://github.com/vincentmakes/turbo-ea/issues/599).
+
 ## [1.29.1] - 2026-05-25
 
 ### Security
