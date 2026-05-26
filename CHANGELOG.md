@@ -5,6 +5,11 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.30.3] - 2026-05-26
+
+### Changed
+- **Multi-select fields on Card Detail are now obvious to use.** The previous editor opened a plain dropdown with no indication that multiple values could be chosen, no marker on already-selected options, and chips that couldn't be removed without re-opening the dropdown. Each option in the dropdown now shows a checkbox (so multi-select is visually obvious and currently-picked options are flagged), the selected-value chips on the closed control are coloured per the option's metamodel color and carry a delete (✕) button so a value can be removed in one click without re-opening the menu, and an empty editor shows a "Select one or more…" hint instead of a blank box. New i18n key `common:labels.selectMultiple` added in all 8 supported locales.
+
 ## [1.30.2] - 2026-05-26
 
 ### Fixed
