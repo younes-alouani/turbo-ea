@@ -873,16 +873,56 @@ function StagedTable({ rows }: StagedTableProps) {
                 color={row.status === "error" ? "error" : "default"}
               />
             </TableCell>
-            <TableCell>
-              {row.error_message ||
-                (row.diff && Object.keys(row.diff).length > 0
-                  ? Object.keys(row.diff).join(", ")
-                  : "—")}
+            <TableCell sx={{ wordBreak: "break-word" }}>
+              <StagedRowNote row={row} />
             </TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+/**
+ * Render the per-row Note cell. Conflicts carry their explanation under
+ * ``diff.reason`` — surface that text directly instead of the literal
+ * key. Updates carry a per-field ``{old, new}`` map; show the field
+ * names that changed (with a tooltip listing the old → new values) so
+ * the admin sees what's about to be touched without an attribute dump.
+ */
+function StagedRowNote({ row }: { row: StagedRecord }) {
+  if (row.error_message) {
+    return <span>{row.error_message}</span>;
+  }
+  const diff = row.diff || {};
+  if (typeof diff.reason === "string" && diff.reason) {
+    return <span>{diff.reason}</span>;
+  }
+  const keys = Object.keys(diff).filter((k) => k !== "reason");
+  if (keys.length === 0) return <span>—</span>;
+  // Build a short ``"old" → "new"`` summary per changed field so the
+  // tooltip is human-scannable. Nested attribute diffs collapse to the
+  // attribute key list.
+  const tooltip = keys
+    .map((k) => {
+      const v = diff[k] as { old?: unknown; new?: unknown } | Record<string, unknown>;
+      if (v && typeof v === "object" && "old" in v && "new" in v) {
+        const oldV = (v as { old: unknown }).old;
+        const newV = (v as { new: unknown }).new;
+        return `${k}: ${JSON.stringify(oldV)} → ${JSON.stringify(newV)}`;
+      }
+      if (v && typeof v === "object") {
+        return `${k}: ${Object.keys(v).join(", ")}`;
+      }
+      return `${k}: ${JSON.stringify(v)}`;
+    })
+    .join("\n");
+  return (
+    <Tooltip title={<pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{tooltip}</pre>}>
+      <span style={{ textDecoration: "underline dotted", cursor: "help" }}>
+        {keys.join(", ")}
+      </span>
+    </Tooltip>
   );
 }
 
