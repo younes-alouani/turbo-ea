@@ -12,8 +12,6 @@ name: Version sync check
 
 on:
   pull_request:
-    paths:
-      - VERSION
 
 permissions:
   contents: read
