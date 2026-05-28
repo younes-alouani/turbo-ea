@@ -5,6 +5,10 @@ import type { EventEntry } from "@/types";
 const STORAGE_KEY = "turbo-ea.cardTabsSeen";
 const LRU_CAP = 200;
 const HISTORY_PAGE_SIZE = 50;
+// Sentinel timestamp captured on the very first hook mount per card; never
+// overwritten on subsequent visits. Acts as the fallback "you've been here"
+// baseline for tabs the user has never explicitly opened.
+const FIRST_VISIT_KEY = "__first";
 
 const EVENT_TAB_MAP: Record<string, string> = {
   "comment.created": "comments",
@@ -65,7 +69,7 @@ function bumpLru(store: StoreShape, cardId: string) {
   store.__lru = lru;
 }
 
-function getCardSeen(store: StoreShape, cardId: string): Record<string, string> {
+function getCardEntry(store: StoreShape, cardId: string): Record<string, string> {
   const entry = store[cardId];
   if (!entry || Array.isArray(entry)) return {};
   return entry;
@@ -79,6 +83,21 @@ export interface UseCardTabActivity {
 export function useCardTabActivity(cardId: string): UseCardTabActivity {
   const [latestActivity, setLatestActivity] = useState<Record<string, string>>({});
   const [seenVersion, setSeenVersion] = useState(0);
+
+  // Stamp the card's first-visit baseline once, when the hook mounts for a
+  // card that has never been visited before. Tabs the user has never opened
+  // fall back to this timestamp for the "what counts as new" comparison.
+  useEffect(() => {
+    const store = readStore();
+    const entry = getCardEntry(store, cardId);
+    if (!entry[FIRST_VISIT_KEY]) {
+      entry[FIRST_VISIT_KEY] = new Date().toISOString();
+      store[cardId] = entry;
+      bumpLru(store, cardId);
+      writeStore(store);
+      setSeenVersion((n) => n + 1);
+    }
+  }, [cardId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,26 +128,30 @@ export function useCardTabActivity(cardId: string): UseCardTabActivity {
     };
   }, [cardId]);
 
-  const seenForCard = useMemo(() => {
-    return getCardSeen(readStore(), cardId);
+  const cardEntry = useMemo(() => {
+    return getCardEntry(readStore(), cardId);
     // seenVersion intentionally in deps: markSeen bumps it to force re-read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardId, seenVersion]);
 
   const hasUpdates = useCallback(
     (tabKey: string): boolean => {
+      const firstVisit = cardEntry[FIRST_VISIT_KEY];
+      if (!firstVisit) return false; // card has never been visited
       const latest = latestActivity[tabKey];
-      const seen = seenForCard[tabKey];
-      if (!latest || !seen) return false;
-      return latest > seen;
+      if (!latest) return false;
+      // Tabs the user has explicitly opened use that timestamp; otherwise
+      // fall back to the card-wide first-visit baseline.
+      const baseline = cardEntry[tabKey] || firstVisit;
+      return latest > baseline;
     },
-    [latestActivity, seenForCard],
+    [latestActivity, cardEntry],
   );
 
   const markSeen = useCallback(
     (tabKey: string) => {
       const store = readStore();
-      const existing = getCardSeen(store, cardId);
+      const existing = getCardEntry(store, cardId);
       existing[tabKey] = new Date().toISOString();
       store[cardId] = existing;
       bumpLru(store, cardId);

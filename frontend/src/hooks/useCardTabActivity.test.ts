@@ -25,6 +25,7 @@ beforeEach(() => {
 
 describe("useCardTabActivity", () => {
   it("returns no dots on a first-ever visit, even when activity exists", async () => {
+    // All activity precedes the (just-stamped) first-visit baseline.
     vi.mocked(api.get).mockResolvedValueOnce([
       { id: "1", event_type: "comment.created", created_at: isoMinus(60) },
       { id: "2", event_type: "card.updated", created_at: isoMinus(120) },
@@ -33,29 +34,44 @@ describe("useCardTabActivity", () => {
     const { result } = renderHook(() => useCardTabActivity(CARD_A));
 
     await waitFor(() => {
-      // History fetch settled.
       expect(api.get).toHaveBeenCalled();
     });
 
-    // First-visit guard: no prior lastSeen → never a dot.
     expect(result.current.hasUpdates("comments")).toBe(false);
     expect(result.current.hasUpdates("card")).toBe(false);
     expect(result.current.hasUpdates("history")).toBe(false);
   });
 
-  it("shows a dot when activity is newer than lastSeen", async () => {
-    // Seed lastSeen for the Comments tab in the past.
+  it("stamps a first-visit baseline that persists across remounts", async () => {
+    vi.mocked(api.get).mockResolvedValue([]);
+    const { unmount } = renderHook(() => useCardTabActivity(CARD_A));
+    await waitFor(() => expect(api.get).toHaveBeenCalled());
+    const firstSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    const first = firstSnapshot[CARD_A].__first;
+    expect(first).toBeDefined();
+
+    unmount();
+
+    // A second mount must NOT overwrite the first-visit timestamp.
+    renderHook(() => useCardTabActivity(CARD_A));
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
+    const secondSnapshot = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    expect(secondSnapshot[CARD_A].__first).toBe(first);
+  });
+
+  it("shows dots on tabs the user has never opened when activity post-dates first visit", async () => {
+    // User A's first visit was a while ago; comment came in afterwards.
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        [CARD_A]: { comments: isoMinus(300) },
+        [CARD_A]: { __first: isoMinus(300) },
         __lru: [CARD_A],
       }),
     );
 
     vi.mocked(api.get).mockResolvedValueOnce([
-      // Newer than lastSeen → should dot.
       { id: "1", event_type: "comment.created", created_at: isoMinus(60) },
+      { id: "2", event_type: "stakeholder.added", created_at: isoMinus(45) },
     ]);
 
     const { result } = renderHook(() => useCardTabActivity(CARD_A));
@@ -63,20 +79,22 @@ describe("useCardTabActivity", () => {
     await waitFor(() => {
       expect(result.current.hasUpdates("comments")).toBe(true);
     });
-    expect(result.current.hasUpdates("card")).toBe(false);
+    expect(result.current.hasUpdates("stakeholders")).toBe(true);
+    // No risk events in the fetch → no dot.
+    expect(result.current.hasUpdates("risks")).toBe(false);
   });
 
-  it("does not show a dot when lastSeen is more recent than activity", async () => {
+  it("does not show a dot when activity precedes the first visit", async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        [CARD_A]: { comments: isoMinus(10) },
+        [CARD_A]: { __first: isoMinus(30) },
         __lru: [CARD_A],
       }),
     );
 
     vi.mocked(api.get).mockResolvedValueOnce([
-      { id: "1", event_type: "comment.created", created_at: isoMinus(60) },
+      { id: "1", event_type: "comment.created", created_at: isoMinus(120) },
     ]);
 
     const { result } = renderHook(() => useCardTabActivity(CARD_A));
@@ -88,17 +106,18 @@ describe("useCardTabActivity", () => {
     expect(result.current.hasUpdates("comments")).toBe(false);
   });
 
-  it("markSeen clears the dot", async () => {
+  it("markSeen clears the dot for that tab without affecting others", async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        [CARD_A]: { stakeholders: isoMinus(300) },
+        [CARD_A]: { __first: isoMinus(300) },
         __lru: [CARD_A],
       }),
     );
 
     vi.mocked(api.get).mockResolvedValueOnce([
       { id: "1", event_type: "stakeholder.added", created_at: isoMinus(30) },
+      { id: "2", event_type: "comment.created", created_at: isoMinus(30) },
     ]);
 
     const { result } = renderHook(() => useCardTabActivity(CARD_A));
@@ -106,29 +125,27 @@ describe("useCardTabActivity", () => {
     await waitFor(() => {
       expect(result.current.hasUpdates("stakeholders")).toBe(true);
     });
+    expect(result.current.hasUpdates("comments")).toBe(true);
 
     act(() => {
       result.current.markSeen("stakeholders");
     });
 
     expect(result.current.hasUpdates("stakeholders")).toBe(false);
+    // Other tab still dotted.
+    expect(result.current.hasUpdates("comments")).toBe(true);
 
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(persisted[CARD_A].stakeholders).toBeDefined();
-    expect(persisted.__lru).toContain(CARD_A);
+    expect(persisted[CARD_A].comments).toBeUndefined();
+    expect(persisted[CARD_A].__first).toBeDefined();
   });
 
   it("buckets various event types into the right tabs", async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        [CARD_A]: {
-          card: isoMinus(500),
-          comments: isoMinus(500),
-          stakeholders: isoMinus(500),
-          resources: isoMinus(500),
-          risks: isoMinus(500),
-        },
+        [CARD_A]: { __first: isoMinus(500) },
         __lru: [CARD_A],
       }),
     );
@@ -147,7 +164,6 @@ describe("useCardTabActivity", () => {
     });
     expect(result.current.hasUpdates("resources")).toBe(true);
     expect(result.current.hasUpdates("risks")).toBe(true);
-    // No comment/stakeholder events in the fetch → no dot.
     expect(result.current.hasUpdates("comments")).toBe(false);
     expect(result.current.hasUpdates("stakeholders")).toBe(false);
   });
@@ -155,12 +171,12 @@ describe("useCardTabActivity", () => {
   it("evicts oldest cards from the LRU when capacity is exceeded", async () => {
     vi.mocked(api.get).mockResolvedValue([]);
 
-    // Seed the store with 200 cards, plus the about-to-be-added one.
+    // Seed the store with 200 cards.
     const seeded: Record<string, Record<string, string>> = {};
     const lru: string[] = [];
     for (let i = 0; i < 200; i++) {
       const id = `card-${i.toString().padStart(4, "0")}`;
-      seeded[id] = { card: isoMinus(1000) };
+      seeded[id] = { __first: isoMinus(1000) };
       lru.push(id);
     }
     localStorage.setItem(
@@ -168,19 +184,14 @@ describe("useCardTabActivity", () => {
       JSON.stringify({ ...seeded, __lru: lru }),
     );
 
-    const { result } = renderHook(() => useCardTabActivity("card-NEW"));
+    renderHook(() => useCardTabActivity("card-NEW"));
 
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalled();
-    });
-
-    act(() => {
-      result.current.markSeen("card");
+      const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+      expect(persisted["card-NEW"]).toBeDefined();
     });
 
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
-    expect(persisted["card-NEW"]).toBeDefined();
-    // Oldest entry (card-0000) should have been evicted.
     expect(persisted["card-0000"]).toBeUndefined();
     expect(persisted.__lru.length).toBe(200);
     expect(persisted.__lru[persisted.__lru.length - 1]).toBe("card-NEW");
@@ -199,7 +210,7 @@ describe("useCardTabActivity", () => {
       expect(api.get).toHaveBeenCalled();
     });
 
-    // Treated as first-visit → no dot.
+    // First visit just stamped — activity from 10s ago is older. No dot.
     expect(result.current.hasUpdates("comments")).toBe(false);
 
     act(() => {
@@ -207,6 +218,7 @@ describe("useCardTabActivity", () => {
     });
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(persisted[CARD_A].comments).toBeDefined();
+    expect(persisted[CARD_A].__first).toBeDefined();
   });
 
   it("re-fetches when cardId changes", async () => {
@@ -219,7 +231,7 @@ describe("useCardTabActivity", () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        [CARD_B]: { comments: isoMinus(300) },
+        [CARD_B]: { __first: isoMinus(300) },
         __lru: [CARD_B],
       }),
     );
