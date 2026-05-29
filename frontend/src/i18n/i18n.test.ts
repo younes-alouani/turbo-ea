@@ -18,6 +18,7 @@ const NAMESPACES = [
   "diagrams",
   "delivery",
   "grc",
+  "ppm",
   "notifications",
   "validation",
 ] as const;
@@ -299,7 +300,7 @@ describe("SUPPORTED_LOCALES matches locale data", () => {
     }
   });
 
-  it("every supported locale has all 13 namespaces", () => {
+  it("every supported locale has all 14 namespaces", () => {
     for (const locale of SUPPORTED_LOCALES) {
       const data = i18n.store.data[locale];
       for (const ns of NAMESPACES) {
