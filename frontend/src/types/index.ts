@@ -1512,11 +1512,13 @@ export interface RiskImportItem {
   owner_name?: string | null;
   target_resolution_date?: string | null;
   card_names?: string[];
+  /** When it matches an existing risk's reference, the row is skipped. */
+  reference?: string | null;
 }
 
 export interface RiskImportResult {
   row_index: number;
-  status: "created" | "failed";
+  status: "created" | "skipped" | "failed";
   id: string | null;
   reference: string | null;
   error: string | null;
@@ -1526,6 +1528,7 @@ export interface RiskImportResult {
 export interface RiskImportResponse {
   results: RiskImportResult[];
   created: number;
+  skipped: number;
   failed: number;
   dry_run: boolean;
 }

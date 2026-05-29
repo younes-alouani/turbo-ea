@@ -651,7 +651,7 @@
   "risks.export.sheetRisks": "Riscos",
   "risks.export.sheetTasks": "Tarefas de mitigação",
   "risks.import.title": "Importar riscos",
-  "risks.import.intro": "Carregue um ficheiro .xlsx para criar riscos em massa. Cada linha torna-se um novo risco; as referências existentes são ignoradas. Os responsáveis são associados por e-mail e as fichas por nome exato — tudo o que não puder ser associado é ignorado com um aviso.",
+  "risks.import.intro": "Carregue um ficheiro .xlsx para criar riscos em massa. Cada linha torna-se um novo risco; as linhas cuja referência já corresponde a um risco existente são ignoradas. Os responsáveis são associados por e-mail e as fichas por nome exato — tudo o que não puder ser associado é ignorado com um aviso.",
   "risks.import.downloadTemplate": "Descarregar modelo",
   "risks.import.chooseFile": "Escolher ficheiro .xlsx",
   "risks.import.parsing": "A ler o ficheiro…",
@@ -665,5 +665,8 @@
   "risks.import.rowLabel": "Linha {{row}}",
   "risks.import.apply": "Importar {{count}} riscos",
   "risks.import.doneTitle": "{{count}} riscos importados",
-  "risks.import.doneFailed": "{{count}} linhas foram ignoradas devido a erros."
+  "risks.import.doneFailed": "{{count}} linhas foram ignoradas devido a erros.",
+  "risks.import.willSkip": "{{count}} já existem (ignorados)",
+  "risks.import.skippedBlock": "As linhas cuja referência já corresponde a um risco existente são ignoradas — o importador nunca atualiza riscos existentes.",
+  "risks.import.doneSkipped": "{{count}} linhas foram ignoradas (já existem)."
 }

@@ -9003,6 +9003,17 @@
             ],
             "title": "Owner Name"
           },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
           "residual_impact": {
             "anyOf": [
               {
@@ -9104,6 +9115,11 @@
             },
             "title": "Results",
             "type": "array"
+          },
+          "skipped": {
+            "default": 0,
+            "title": "Skipped",
+            "type": "integer"
           }
         },
         "required": [
@@ -9156,6 +9172,7 @@
           "status": {
             "enum": [
               "created",
+              "skipped",
               "failed"
             ],
             "title": "Status",
@@ -25644,7 +25661,7 @@
     },
     "/api/v1/risks/bulk-import": {
       "post": {
-        "description": "Spreadsheet importer for the Risk Register \u2014 create-only.\n\nEach row carries its own ``row_index`` so the caller can pair the\nresponse back to its spreadsheet row. Every row creates a brand-new\nrisk with a freshly generated ``R-NNNNNN`` reference; any reference in\nthe file is ignored. Owner is resolved best-effort by email (preferred)\nor exact display name; cards are linked best-effort by exact name.\nUnresolved / ambiguous values produce a non-blocking warning and are\nskipped \u2014 the risk still imports.\n\n``dry_run=True`` runs every validator and resolver, then rolls back so\nthe UI can preview the outcome without persisting anything (and without\nemitting owner Todos, notifications, or card-timeline events).\nPermission: ``risks.manage``.",
+        "description": "Spreadsheet importer for the Risk Register \u2014 create-only.\n\nEach row carries its own ``row_index`` so the caller can pair the\nresponse back to its spreadsheet row. A row whose ``reference`` matches\nan existing risk is **skipped** \u2014 the importer never updates existing\nrisks, so re-importing a previously exported register is idempotent.\nEvery other row creates a brand-new risk with a freshly generated\n``R-NNNNNN`` reference. Owner is resolved best-effort by email\n(preferred) or exact display name; cards are linked best-effort by exact\nname. Unresolved / ambiguous values produce a non-blocking warning and\nare skipped \u2014 the risk still imports.\n\n``dry_run=True`` runs every validator and resolver, then rolls back so\nthe UI can preview the outcome without persisting anything (and without\nemitting owner Todos, notifications, or card-timeline events).\nPermission: ``risks.manage``.",
         "operationId": "bulk_import_risks_api_v1_risks_bulk_import_post",
         "requestBody": {
           "content": {

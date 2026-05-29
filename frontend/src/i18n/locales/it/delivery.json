@@ -651,7 +651,7 @@
   "risks.export.sheetRisks": "Rischi",
   "risks.export.sheetTasks": "Attività di mitigazione",
   "risks.import.title": "Importa rischi",
-  "risks.import.intro": "Carica un file .xlsx per creare rischi in blocco. Ogni riga diventa un nuovo rischio; i riferimenti esistenti vengono ignorati. I responsabili vengono abbinati tramite e-mail e le schede tramite nome esatto — tutto ciò che non può essere abbinato viene saltato con un avviso.",
+  "risks.import.intro": "Carica un file .xlsx per creare rischi in blocco. Ogni riga diventa un nuovo rischio; le righe il cui riferimento corrisponde già a un rischio esistente vengono saltate. I responsabili vengono abbinati tramite e-mail e le schede tramite nome esatto — tutto ciò che non può essere abbinato viene saltato con un avviso.",
   "risks.import.downloadTemplate": "Scarica modello",
   "risks.import.chooseFile": "Scegli file .xlsx",
   "risks.import.parsing": "Lettura del file…",
@@ -665,5 +665,8 @@
   "risks.import.rowLabel": "Riga {{row}}",
   "risks.import.apply": "Importa {{count}} rischi",
   "risks.import.doneTitle": "{{count}} rischi importati",
-  "risks.import.doneFailed": "{{count}} righe sono state saltate a causa di errori."
+  "risks.import.doneFailed": "{{count}} righe sono state saltate a causa di errori.",
+  "risks.import.willSkip": "{{count}} già esistenti (saltati)",
+  "risks.import.skippedBlock": "Le righe il cui riferimento corrisponde già a un rischio esistente vengono saltate — l'importatore non aggiorna mai i rischi esistenti.",
+  "risks.import.doneSkipped": "{{count}} righe sono state saltate (già esistenti)."
 }

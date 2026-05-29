@@ -651,7 +651,7 @@
   "risks.export.sheetRisks": "Riesgos",
   "risks.export.sheetTasks": "Tareas de mitigación",
   "risks.import.title": "Importar riesgos",
-  "risks.import.intro": "Suba un archivo .xlsx para crear riesgos de forma masiva. Cada fila se convierte en un nuevo riesgo; las referencias existentes se ignoran. Los responsables se asocian por correo electrónico y las fichas por nombre exacto — todo lo que no se pueda asociar se omite con una advertencia.",
+  "risks.import.intro": "Suba un archivo .xlsx para crear riesgos de forma masiva. Cada fila se convierte en un nuevo riesgo; las filas cuya referencia ya coincide con un riesgo existente se omiten. Los responsables se asocian por correo electrónico y las fichas por nombre exacto — todo lo que no se pueda asociar se omite con una advertencia.",
   "risks.import.downloadTemplate": "Descargar plantilla",
   "risks.import.chooseFile": "Elegir archivo .xlsx",
   "risks.import.parsing": "Leyendo archivo…",
@@ -665,5 +665,8 @@
   "risks.import.rowLabel": "Fila {{row}}",
   "risks.import.apply": "Importar {{count}} riesgos",
   "risks.import.doneTitle": "{{count}} riesgos importados",
-  "risks.import.doneFailed": "{{count}} filas se omitieron debido a errores."
+  "risks.import.doneFailed": "{{count}} filas se omitieron debido a errores.",
+  "risks.import.willSkip": "{{count}} ya existen (omitidos)",
+  "risks.import.skippedBlock": "Las filas cuya referencia ya coincide con un riesgo existente se omiten — el importador nunca actualiza riesgos existentes.",
+  "risks.import.doneSkipped": "{{count}} filas se omitieron (ya existen)."
 }

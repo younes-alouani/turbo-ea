@@ -50,6 +50,7 @@ export default function RiskImportDialog({ open, onClose, onComplete }: RiskImpo
   const [busy, setBusy] = useState(false);
   const [warningsExpanded, setWarningsExpanded] = useState(false);
   const [errorsExpanded, setErrorsExpanded] = useState(false);
+  const [skippedExpanded, setSkippedExpanded] = useState(false);
 
   const reset = useCallback(() => {
     setStep("upload");
@@ -61,6 +62,7 @@ export default function RiskImportDialog({ open, onClose, onComplete }: RiskImpo
     setBusy(false);
     setWarningsExpanded(false);
     setErrorsExpanded(false);
+    setSkippedExpanded(false);
     if (fileRef.current) fileRef.current.value = "";
   }, []);
 
@@ -130,6 +132,8 @@ export default function RiskImportDialog({ open, onClose, onComplete }: RiskImpo
     ) ?? [];
   const previewErrors =
     preview?.results.filter((r) => r.status === "failed") ?? [];
+  const previewSkipped =
+    preview?.results.filter((r) => r.status === "skipped") ?? [];
   const canImport = (preview?.created ?? 0) > 0;
 
   return (
@@ -149,7 +153,7 @@ export default function RiskImportDialog({ open, onClose, onComplete }: RiskImpo
             <Typography variant="body2" color="text.secondary">
               {t("delivery:risks.import.intro", {
                 defaultValue:
-                  "Upload an .xlsx file to create risks in bulk. Each row becomes a new risk; existing references are ignored. Owners are matched by email and cards by exact name — anything that can't be matched is skipped with a warning.",
+                  "Upload an .xlsx file to create risks in bulk. Each row becomes a new risk; rows whose reference already matches an existing risk are skipped. Owners are matched by email and cards by exact name — anything that can't be matched is skipped with a warning.",
               })}
             </Typography>
             <Box>
@@ -215,6 +219,17 @@ export default function RiskImportDialog({ open, onClose, onComplete }: RiskImpo
                   label={t("delivery:risks.import.willFail", {
                     count: preview.failed,
                     defaultValue: "{{count}} with errors",
+                  })}
+                />
+              )}
+              {preview.skipped > 0 && (
+                <Chip
+                  color="default"
+                  variant="outlined"
+                  icon={<MaterialSymbol icon="skip_next" size={16} />}
+                  label={t("delivery:risks.import.willSkip", {
+                    count: preview.skipped,
+                    defaultValue: "{{count}} already exist (skipped)",
                   })}
                 />
               )}
@@ -300,6 +315,41 @@ export default function RiskImportDialog({ open, onClose, onComplete }: RiskImpo
                 </Collapse>
               </Alert>
             )}
+
+            {previewSkipped.length > 0 && (
+              <Alert severity="info">
+                {t("delivery:risks.import.skippedBlock", {
+                  defaultValue:
+                    "Rows whose reference already matches an existing risk are skipped — the importer never updates existing risks.",
+                })}
+                <Link
+                  component="button"
+                  type="button"
+                  underline="hover"
+                  onClick={() => setSkippedExpanded((v) => !v)}
+                  sx={{ display: "block", mt: 0.5 }}
+                >
+                  {skippedExpanded
+                    ? t("common:actions.showLess", { defaultValue: "Show less" })
+                    : t("common:actions.showMore", { defaultValue: "Show details" })}
+                </Link>
+                <Collapse in={skippedExpanded}>
+                  <List dense disablePadding>
+                    {previewSkipped.map((r) => (
+                      <ListItem key={r.row_index} disableGutters>
+                        <ListItemText
+                          primary={t("delivery:risks.import.rowLabel", {
+                            row: r.row_index + 1,
+                            defaultValue: "Row {{row}}",
+                          })}
+                          secondary={r.reference ?? ""}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </Alert>
+            )}
           </Stack>
         )}
 
@@ -316,6 +366,14 @@ export default function RiskImportDialog({ open, onClose, onComplete }: RiskImpo
                 defaultValue: "Imported {{count}} risks",
               })}
             </Typography>
+            {result.skipped > 0 && (
+              <Typography variant="body2" color="text.secondary">
+                {t("delivery:risks.import.doneSkipped", {
+                  count: result.skipped,
+                  defaultValue: "{{count}} rows were skipped (already exist).",
+                })}
+              </Typography>
+            )}
             {result.failed > 0 && (
               <Typography variant="body2" color="text.secondary">
                 {t("delivery:risks.import.doneFailed", {

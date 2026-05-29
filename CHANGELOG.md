@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.35.0] - 2026-05-29
 
 ### Added
-- **Risk Register Excel import.** The Risk Register now has an **Import** button alongside Export. Download a starter `.xlsx` template, fill in one risk per row, and upload it to create risks in bulk. Owners are matched by email and affected cards by exact name on a best-effort basis (unmatched values are skipped with a non-blocking warning), and a server-side dry-run preview shows exactly what will be created — including any per-row errors — before anything is written. Every row creates a brand-new risk; existing references in the file are ignored. Fulfills [#586](https://github.com/vincentmakes/turbo-ea/discussions/586).
+- **Risk Register Excel import.** The Risk Register now has an **Import** button alongside Export. Download a starter `.xlsx` template, fill in one risk per row, and upload it to create risks in bulk. Owners are matched by email and affected cards by exact name on a best-effort basis (unmatched values are skipped with a non-blocking warning), and a server-side dry-run preview shows exactly what will be created — including any per-row errors and how many rows will be skipped — before anything is written. Rows whose reference already matches an existing risk are skipped (the importer never updates existing risks, so re-importing a previously exported register is idempotent); every other row creates a brand-new risk. Fulfills [#586](https://github.com/vincentmakes/turbo-ea/discussions/586).
 
 ## [1.34.0] - 2026-05-29
 

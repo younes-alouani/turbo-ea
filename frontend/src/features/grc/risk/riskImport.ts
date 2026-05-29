@@ -96,6 +96,10 @@ export function parseRiskWorkbook(buffer: ArrayBuffer): RiskImportItem[] {
       owner_name: row.owner || undefined,
       target_resolution_date: row.target_resolution_date || undefined,
       card_names: cards,
+      // Carried so the importer can skip rows that match an existing risk.
+      // Populated when re-importing an exported register (the export's
+      // "Risks" sheet has a `reference` column); blank for new rows.
+      reference: row.reference || undefined,
     });
   }
   return items;

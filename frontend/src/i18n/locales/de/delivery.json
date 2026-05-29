@@ -651,7 +651,7 @@
   "risks.export.sheetRisks": "Risiken",
   "risks.export.sheetTasks": "Maßnahmen",
   "risks.import.title": "Risiken importieren",
-  "risks.import.intro": "Laden Sie eine .xlsx-Datei hoch, um Risiken in großer Menge anzulegen. Jede Zeile wird zu einem neuen Risiko; vorhandene Referenzen werden ignoriert. Eigentümer werden per E-Mail und Karten anhand des exakten Namens zugeordnet — alles, was nicht zugeordnet werden kann, wird mit einer Warnung übersprungen.",
+  "risks.import.intro": "Laden Sie eine .xlsx-Datei hoch, um Risiken in großer Menge anzulegen. Jede Zeile wird zu einem neuen Risiko; Zeilen, deren Referenz bereits zu einem vorhandenen Risiko passt, werden übersprungen. Eigentümer werden per E-Mail und Karten anhand des exakten Namens zugeordnet — alles, was nicht zugeordnet werden kann, wird mit einer Warnung übersprungen.",
   "risks.import.downloadTemplate": "Vorlage herunterladen",
   "risks.import.chooseFile": ".xlsx-Datei auswählen",
   "risks.import.parsing": "Datei wird gelesen…",
@@ -665,5 +665,8 @@
   "risks.import.rowLabel": "Zeile {{row}}",
   "risks.import.apply": "{{count}} Risiken importieren",
   "risks.import.doneTitle": "{{count}} Risiken importiert",
-  "risks.import.doneFailed": "{{count}} Zeilen wurden aufgrund von Fehlern übersprungen."
+  "risks.import.doneFailed": "{{count}} Zeilen wurden aufgrund von Fehlern übersprungen.",
+  "risks.import.willSkip": "{{count}} bereits vorhanden (übersprungen)",
+  "risks.import.skippedBlock": "Zeilen, deren Referenz bereits zu einem vorhandenen Risiko passt, werden übersprungen — der Import aktualisiert niemals bestehende Risiken.",
+  "risks.import.doneSkipped": "{{count}} Zeilen wurden übersprungen (bereits vorhanden)."
 }

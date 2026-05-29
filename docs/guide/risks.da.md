@@ -97,7 +97,7 @@ Risikoregistrets **Export**-knap skriver et to-arks `.xlsx`: ark 1 er det filtre
 
 ### Import {: #import }
 
-Knappen **Importér** ved siden af «Eksportér» indlæser risici i massevis fra en `.xlsx`-fil. Klik på **Download skabelon** for at få en startmappe med de rigtige overskrifter, udfyld én risiko pr. række, og upload den. Hver række opretter en **helt ny** risiko med en automatisk genereret reference `R-NNNNNN` — en eventuel referencekolonne i filen ignoreres (importen opdaterer aldrig eksisterende risici).
+Knappen **Importér** ved siden af «Eksportér» indlæser risici i massevis fra en `.xlsx`-fil. Klik på **Download skabelon** for at få en startmappe med de rigtige overskrifter, udfyld én risiko pr. række, og upload den. En række, hvis `reference` matcher en eksisterende risiko, **springes over** (importen opdaterer aldrig eksisterende risici), så genimport af et tidligere eksporteret register er idempotent; hver anden række opretter en **helt ny** risiko med en automatisk genereret reference `R-NNNNNN`. Eksemplet viser, hvor mange rækker der springes over, før du bekræfter.
 
 Genkendte kolonner: `title` (påkrævet), `description`, `category`, `initial_probability`, `initial_impact`, `residual_probability`, `residual_impact`, `status`, `owner_email`, `target_resolution_date` (`YYYY-MM-DD`) og `cards` (kortnavne adskilt af semikolon). Ejere matches via e-mail og kort via præcist navn **så vidt muligt** — alt, der ikke kan matches, springes over med en ikke-blokerende advarsel, og risikoen importeres alligevel. Før noget skrives, vises et eksempel, der viser, hvor mange rækker der oprettes, hvilke der har fejl, og eventuelle advarsler; intet gemmes, før du bekræfter. Kræver tilladelsen `risks.manage`.
 

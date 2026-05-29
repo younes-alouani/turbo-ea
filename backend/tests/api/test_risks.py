@@ -183,6 +183,94 @@ async def test_all_rows_fail_persists_nothing(client, db, env):
 
 
 # ---------------------------------------------------------------------------
+# Skip rows whose reference already exists
+# ---------------------------------------------------------------------------
+
+
+async def test_existing_reference_is_skipped(client, db, env):
+    # Seed a risk, then import a file that references it plus a new row.
+    existing = Risk(
+        reference="R-000001",
+        title="Pre-existing risk",
+        description="",
+        category="operational",
+        source_type="manual",
+        initial_probability="medium",
+        initial_impact="medium",
+        initial_level="medium",
+        status="identified",
+    )
+    db.add(existing)
+    await db.flush()
+
+    before = await _risk_count(db)
+    resp = await client.post(
+        BULK_IMPORT,
+        json={
+            "items": [
+                {"row_index": 0, "title": "Pre-existing risk", "reference": "R-000001"},
+                {"row_index": 1, "title": "Genuinely new"},
+            ]
+        },
+        headers=auth_headers(env["admin"]),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["created"] == 1
+    assert body["skipped"] == 1
+    assert body["failed"] == 0
+    by_row = {r["row_index"]: r for r in body["results"]}
+    assert by_row[0]["status"] == "skipped"
+    assert by_row[0]["reference"] == "R-000001"
+    assert by_row[1]["status"] == "created"
+    # Only the new row was persisted; the duplicate did not create a second copy.
+    assert await _risk_count(db) == before + 1
+
+
+async def test_reference_match_is_case_insensitive(client, db, env):
+    db.add(
+        Risk(
+            reference="R-000042",
+            title="Existing",
+            description="",
+            category="operational",
+            source_type="manual",
+            initial_probability="medium",
+            initial_impact="medium",
+            initial_level="medium",
+            status="identified",
+        )
+    )
+    await db.flush()
+    resp = await client.post(
+        BULK_IMPORT,
+        json={"items": [{"row_index": 0, "title": "Dup", "reference": " r-000042 "}]},
+        headers=auth_headers(env["admin"]),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["skipped"] == 1
+    assert body["created"] == 0
+
+
+async def test_blank_reference_always_creates(client, db, env):
+    resp = await client.post(
+        BULK_IMPORT,
+        json={
+            "items": [
+                {"row_index": 0, "title": "No ref", "reference": ""},
+                {"row_index": 1, "title": "Null ref", "reference": None},
+            ]
+        },
+        headers=auth_headers(env["admin"]),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["created"] == 2
+    assert body["skipped"] == 0
+
+
+# ---------------------------------------------------------------------------
 # Best-effort owner + card resolution
 # ---------------------------------------------------------------------------
 

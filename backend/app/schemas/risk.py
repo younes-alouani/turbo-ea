@@ -123,6 +123,10 @@ class RiskImportItem(BaseModel):
     owner_name: str | None = None
     target_resolution_date: date | None = None
     card_names: list[str] = Field(default_factory=list)
+    # When set and it matches an existing risk's reference, the row is
+    # skipped (the importer never updates existing risks). Blank → a new
+    # reference is generated.
+    reference: str | None = None
 
 
 class RiskImportRequest(BaseModel):
@@ -132,7 +136,7 @@ class RiskImportRequest(BaseModel):
 
 class RiskImportResult(BaseModel):
     row_index: int
-    status: Literal["created", "failed"]
+    status: Literal["created", "skipped", "failed"]
     id: str | None = None
     reference: str | None = None
     error: str | None = None
@@ -142,6 +146,7 @@ class RiskImportResult(BaseModel):
 class RiskImportResponse(BaseModel):
     results: list[RiskImportResult]
     created: int
+    skipped: int = 0
     failed: int
     dry_run: bool = False
 

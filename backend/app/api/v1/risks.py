@@ -439,20 +439,27 @@ async def create_risk(
     return RiskOut.model_validate(await risk_to_dict(db, risk))
 
 
-async def _next_reference_base(db: AsyncSession) -> int:
-    """Read the current highest ``R-NNNNNN`` integer once.
+async def _load_reference_state(db: AsyncSession) -> tuple[int, set[str]]:
+    """Read every existing risk reference once.
 
-    Bulk import allocates references sequentially from this base (``base+1``,
-    ``base+2`` …) instead of calling :func:`next_reference` per row, which
-    would re-read the same max until the first flush and hand out duplicates.
+    Returns ``(highest, existing)`` where ``highest`` is the largest
+    ``R-NNNNNN`` integer (bulk import allocates sequentially from
+    ``highest + 1`` instead of calling :func:`next_reference` per row, which
+    would re-read the same max until the first flush and hand out duplicates)
+    and ``existing`` is the set of upper-cased references already in use, so
+    the importer can skip rows whose reference matches an existing risk.
     """
     result = await db.execute(select(Risk.reference))
     highest = 0
+    existing: set[str] = set()
     for (ref,) in result.all():
-        match = _REFERENCE_RE.match(ref or "")
+        if not ref:
+            continue
+        existing.add(ref.strip().upper())
+        match = _REFERENCE_RE.match(ref)
         if match:
             highest = max(highest, int(match.group(1)))
-    return highest
+    return highest, existing
 
 
 @router.post("/bulk-import", response_model=RiskImportResponse)
@@ -464,12 +471,14 @@ async def bulk_import_risks(
     """Spreadsheet importer for the Risk Register — create-only.
 
     Each row carries its own ``row_index`` so the caller can pair the
-    response back to its spreadsheet row. Every row creates a brand-new
-    risk with a freshly generated ``R-NNNNNN`` reference; any reference in
-    the file is ignored. Owner is resolved best-effort by email (preferred)
-    or exact display name; cards are linked best-effort by exact name.
-    Unresolved / ambiguous values produce a non-blocking warning and are
-    skipped — the risk still imports.
+    response back to its spreadsheet row. A row whose ``reference`` matches
+    an existing risk is **skipped** — the importer never updates existing
+    risks, so re-importing a previously exported register is idempotent.
+    Every other row creates a brand-new risk with a freshly generated
+    ``R-NNNNNN`` reference. Owner is resolved best-effort by email
+    (preferred) or exact display name; cards are linked best-effort by exact
+    name. Unresolved / ambiguous values produce a non-blocking warning and
+    are skipped — the risk still imports.
 
     ``dry_run=True`` runs every validator and resolver, then rolls back so
     the UI can preview the outcome without persisting anything (and without
@@ -483,12 +492,28 @@ async def bulk_import_risks(
     # transaction (e.g. the savepoint backing the integration-test fixture).
     dry_run_savepoint = await db.begin_nested() if body.dry_run else None
 
-    base = await _next_reference_base(db)
+    base, existing_refs = await _load_reference_state(db)
     results: list[RiskImportResult] = []
     created_count = 0
+    skipped_count = 0
     next_seq = base
 
     for item in body.items:
+        # Skip rows whose reference already belongs to a risk — the importer
+        # never updates existing risks. Checked before the savepoint/creation
+        # so a skipped row consumes nothing.
+        existing_ref = (item.reference or "").strip().upper()
+        if existing_ref and existing_ref in existing_refs:
+            skipped_count += 1
+            results.append(
+                RiskImportResult(
+                    row_index=item.row_index,
+                    status="skipped",
+                    reference=existing_ref,
+                )
+            )
+            continue
+
         warnings: list[str] = []
         # Per-row savepoint so a single bad row can't poison the batch.
         row_savepoint = await db.begin_nested()
@@ -627,6 +652,7 @@ async def bulk_import_risks(
     return RiskImportResponse(
         results=results,
         created=created_count,
+        skipped=skipped_count,
         failed=failed_count,
         dry_run=body.dry_run,
     )

@@ -651,7 +651,7 @@
   "risks.export.sheetRisks": "Risici",
   "risks.export.sheetTasks": "Afbødningsopgaver",
   "risks.import.title": "Importér risici",
-  "risks.import.intro": "Upload en .xlsx-fil for at oprette risici i massevis. Hver række bliver til en ny risiko; eksisterende referencer ignoreres. Ejere matches via e-mail og kort via præcist navn — alt, der ikke kan matches, springes over med en advarsel.",
+  "risks.import.intro": "Upload en .xlsx-fil for at oprette risici i massevis. Hver række bliver til en ny risiko; rækker, hvis reference allerede matcher en eksisterende risiko, springes over. Ejere matches via e-mail og kort via præcist navn — alt, der ikke kan matches, springes over med en advarsel.",
   "risks.import.downloadTemplate": "Download skabelon",
   "risks.import.chooseFile": "Vælg .xlsx-fil",
   "risks.import.parsing": "Læser fil…",
@@ -665,5 +665,8 @@
   "risks.import.rowLabel": "Række {{row}}",
   "risks.import.apply": "Importér {{count}} risici",
   "risks.import.doneTitle": "Importerede {{count}} risici",
-  "risks.import.doneFailed": "{{count}} rækker blev sprunget over på grund af fejl."
+  "risks.import.doneFailed": "{{count}} rækker blev sprunget over på grund af fejl.",
+  "risks.import.willSkip": "{{count}} findes allerede (sprunget over)",
+  "risks.import.skippedBlock": "Rækker, hvis reference allerede matcher en eksisterende risiko, springes over — importen opdaterer aldrig eksisterende risici.",
+  "risks.import.doneSkipped": "{{count}} rækker blev sprunget over (findes allerede)."
 }

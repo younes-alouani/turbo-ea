@@ -97,7 +97,7 @@ The Risk Register's **Export** button writes a two-sheet `.xlsx`: sheet 1 is the
 
 ### Import {: #import }
 
-The **Import** button next to Export loads risks in bulk from an `.xlsx` file. Click **Download template** to get a starter workbook with the right headers, fill in one risk per row, and upload it. Every row creates a **brand-new** risk with a freshly generated `R-NNNNNN` reference — any reference column in the file is ignored (the importer never updates existing risks).
+The **Import** button next to Export loads risks in bulk from an `.xlsx` file. Click **Download template** to get a starter workbook with the right headers, fill in one risk per row, and upload it. A row whose `reference` matches an existing risk is **skipped** (the importer never updates existing risks), so re-importing a previously exported register is idempotent; every other row creates a **brand-new** risk with a freshly generated `R-NNNNNN` reference. The preview tells you how many rows will be skipped before you confirm.
 
 Recognised columns: `title` (required), `description`, `category`, `initial_probability`, `initial_impact`, `residual_probability`, `residual_impact`, `status`, `owner_email`, `target_resolution_date` (`YYYY-MM-DD`) and `cards` (semicolon-separated card names). Owners are matched by email and cards by exact name on a **best-effort** basis — anything that can't be matched is skipped with a non-blocking warning and the risk still imports. Before anything is written you get a preview showing how many rows will be created, which have errors, and any warnings; nothing is persisted until you confirm. Requires the `risks.manage` permission.
 

@@ -651,7 +651,7 @@
   "risks.export.sheetRisks": "Risks",
   "risks.export.sheetTasks": "Mitigation tasks",
   "risks.import.title": "Import risks",
-  "risks.import.intro": "Upload an .xlsx file to create risks in bulk. Each row becomes a new risk; existing references are ignored. Owners are matched by email and cards by exact name — anything that can't be matched is skipped with a warning.",
+  "risks.import.intro": "Upload an .xlsx file to create risks in bulk. Each row becomes a new risk; rows whose reference already matches an existing risk are skipped. Owners are matched by email and cards by exact name — anything that can't be matched is skipped with a warning.",
   "risks.import.downloadTemplate": "Download template",
   "risks.import.chooseFile": "Choose .xlsx file",
   "risks.import.parsing": "Reading file…",
@@ -665,5 +665,8 @@
   "risks.import.rowLabel": "Row {{row}}",
   "risks.import.apply": "Import {{count}} risks",
   "risks.import.doneTitle": "Imported {{count}} risks",
-  "risks.import.doneFailed": "{{count}} rows were skipped due to errors."
+  "risks.import.doneFailed": "{{count}} rows were skipped due to errors.",
+  "risks.import.willSkip": "{{count}} already exist (skipped)",
+  "risks.import.skippedBlock": "Rows whose reference already matches an existing risk are skipped — the importer never updates existing risks.",
+  "risks.import.doneSkipped": "{{count}} rows were skipped (already exist)."
 }
