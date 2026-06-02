@@ -265,6 +265,8 @@
   "modules.ppm": "PPM",
   "modules.grc": "GRC",
   "modules.turbolens": "TurboLens",
+  "accessDenied.title": "Accesso negato",
+  "accessDenied.body": "Non hai i permessi per visualizzare questa pagina. Contatta il tuo amministratore se hai bisogno di accesso.",
   "moduleDisabled.title": "{{module}} è disabilitato",
   "moduleDisabled.body": "Il modulo {{module}} è attualmente disabilitato da un amministratore. Abilitalo dalle impostazioni di amministrazione per accedere a questa sezione.",
   "moduleDisabled.backToDashboard": "Torna alla dashboard",

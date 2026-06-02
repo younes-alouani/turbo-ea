@@ -14,6 +14,7 @@ import LoginPage from "@/features/auth/LoginPage";
 import SsoCallback from "@/features/auth/SsoCallback";
 import SetPasswordPage from "@/features/auth/SetPasswordPage";
 import ModuleGate from "@/components/ModuleGate";
+import RequirePermission from "@/components/RequirePermission";
 
 const ForgotPasswordPage = lazy(() => import("@/features/auth/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("@/features/auth/ResetPasswordPage"));
@@ -185,19 +186,19 @@ function AppRoutes() {
                 <Route path="/todos" element={<TodosPage />} />
                 <Route path="/surveys" element={<Navigate to="/todos?tab=surveys" />} />
                 <Route path="/surveys/:surveyId/respond/:cardId" element={<SurveyRespond />} />
-                <Route path="/admin/metamodel" element={<MetamodelAdmin />} />
-                <Route path="/admin/users" element={<UsersAdmin />} />
-                <Route path="/admin/settings" element={<SettingsAdmin />} />
-                <Route path="/admin/eol" element={<Navigate to="/admin/settings?tab=eol" />} />
-                <Route path="/admin/web-portals" element={<Navigate to="/admin/settings?tab=web-portals" />} />
-                <Route path="/admin/servicenow" element={<Navigate to="/admin/settings?tab=servicenow" />} />
-                <Route path="/admin/surveys" element={<SurveysAdmin />} />
-                <Route path="/admin/surveys/new" element={<SurveyBuilder />} />
-                <Route path="/admin/surveys/:id/results" element={<SurveyResults />} />
-                <Route path="/admin/surveys/:id" element={<SurveyBuilder />} />
+                <Route path="/admin/metamodel" element={<RequirePermission permission="admin.metamodel"><MetamodelAdmin /></RequirePermission>} />
+                <Route path="/admin/users" element={<RequirePermission permission="admin.users"><UsersAdmin /></RequirePermission>} />
+                <Route path="/admin/settings" element={<RequirePermission permission="admin.settings"><SettingsAdmin /></RequirePermission>} />
+                <Route path="/admin/eol" element={<RequirePermission permission="eol.manage"><Navigate to="/admin/settings?tab=eol" /></RequirePermission>} />
+                <Route path="/admin/web-portals" element={<RequirePermission permission="web_portals.manage"><Navigate to="/admin/settings?tab=web-portals" /></RequirePermission>} />
+                <Route path="/admin/servicenow" element={<RequirePermission permission="servicenow.manage"><Navigate to="/admin/settings?tab=servicenow" /></RequirePermission>} />
+                <Route path="/admin/surveys" element={<RequirePermission permission="surveys.manage"><SurveysAdmin /></RequirePermission>} />
+                <Route path="/admin/surveys/new" element={<RequirePermission permission="surveys.manage"><SurveyBuilder /></RequirePermission>} />
+                <Route path="/admin/surveys/:id/results" element={<RequirePermission permission="surveys.manage"><SurveyResults /></RequirePermission>} />
+                <Route path="/admin/surveys/:id" element={<RequirePermission permission="surveys.manage"><SurveyBuilder /></RequirePermission>} />
                 <Route path="/turbolens" element={<ModuleGate module="turbolens"><TurboLensPage /></ModuleGate>} />
                 <Route path="/turbolens/assessments/:id" element={<ModuleGate module="turbolens"><AssessmentViewer /></ModuleGate>} />
-                <Route path="/admin/turbolens" element={<Navigate to="/admin/settings?tab=turbolens" />} />
+                <Route path="/admin/turbolens" element={<RequirePermission permission="turbolens.manage"><Navigate to="/admin/settings?tab=turbolens" /></RequirePermission>} />
                 <Route path="/capability-catalogue" element={<CapabilityCataloguePage />} />
                 <Route path="/process-catalogue" element={<ProcessCataloguePage />} />
                 <Route path="/value-stream-catalogue" element={<ValueStreamCataloguePage />} />

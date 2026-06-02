@@ -265,6 +265,8 @@
   "modules.ppm": "PPM",
   "modules.grc": "GRC",
   "modules.turbolens": "TurboLens",
+  "accessDenied.title": "Acesso negado",
+  "accessDenied.body": "Você não tem permissão para ver esta página. Contate o seu administrador se precisar de acesso.",
   "moduleDisabled.title": "{{module}} está desativado",
   "moduleDisabled.body": "O módulo {{module}} está atualmente desativado por um administrador. Ative-o nas configurações de administração para acessar esta seção.",
   "moduleDisabled.backToDashboard": "Voltar ao painel",

@@ -265,6 +265,8 @@
   "modules.ppm": "PPM",
   "modules.grc": "GRC",
   "modules.turbolens": "TurboLens",
+  "accessDenied.title": "Доступ запрещён",
+  "accessDenied.body": "У вас нет разрешения на просмотр этой страницы. Обратитесь к администратору, если вам нужен доступ.",
   "moduleDisabled.title": "{{module}} отключён",
   "moduleDisabled.body": "Модуль {{module}} в настоящее время отключён администратором. Включите его в настройках администратора, чтобы получить доступ к этому разделу.",
   "moduleDisabled.backToDashboard": "Вернуться к панели",
