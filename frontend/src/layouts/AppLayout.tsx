@@ -86,7 +86,7 @@ const ADMIN_ITEM_DEFS: NavItemDef[] = [
   { labelKey: "admin.metamodel", icon: "settings_suggest", path: "/admin/metamodel", permission: "admin.metamodel" },
   { labelKey: "admin.usersAndRoles", icon: "group", path: "/admin/users", permission: "admin.users" },
   { labelKey: "admin.surveys", icon: "assignment", path: "/admin/surveys", permission: "surveys.manage" },
-  { labelKey: "admin.settings", icon: "settings", path: "/admin/settings", permission: ["admin.settings", "eol.manage", "web_portals.manage", "servicenow.manage", "turbolens.manage"] },
+  { labelKey: "admin.settings", icon: "settings", path: "/admin/settings", permission: "admin.settings" },
 ];
 
 interface PermissionMap {
@@ -118,7 +118,7 @@ export default function AppLayout({ children, user, onLogout }: Props) {
   const can = useCallback(
     (permission: string): boolean => {
       const perms = user.permissions;
-      if (!perms) return true; // Fallback: allow all if permissions not loaded yet
+      if (!perms) return false; // Fail-closed: deny if permissions haven't loaded
       if (perms["*"]) return true;
       return !!perms[permission];
     },

@@ -265,6 +265,8 @@
   "modules.ppm": "PPM",
   "modules.grc": "GRC",
   "modules.turbolens": "TurboLens",
+  "accessDenied.title": "Zugriff verweigert",
+  "accessDenied.body": "Sie haben keine Berechtigung, diese Seite anzuzeigen. Wenden Sie sich an Ihren Administrator, falls Sie Zugriff benötigen.",
   "moduleDisabled.title": "{{module}} ist deaktiviert",
   "moduleDisabled.body": "Das Modul {{module}} ist derzeit von einem Administrator deaktiviert. Aktivieren Sie es in den Admin-Einstellungen, um diesen Bereich zu nutzen.",
   "moduleDisabled.backToDashboard": "Zurück zum Dashboard",
