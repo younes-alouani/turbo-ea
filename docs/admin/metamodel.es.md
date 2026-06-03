@@ -63,7 +63,7 @@ El nombre de sección especial `__description` agrega campos a la sección Descr
 
 #### Puntuación de calidad de datos
 
-La puntuación de **calidad de datos** de una tarjeta mide de forma ponderada cuán completa está. Cada factor que contribuye —cada campo y cuatro factores integrados— se gestiona en un solo lugar: la pestaña **Calidad de datos** del editor del tipo de tarjeta, que se abre con el icono de calidad de la parte superior (junto al icono de traducción).
+La puntuación de **calidad de datos** de una tarjeta mide de forma ponderada cuán completa está. Cada factor que contribuye —cada campo y cuatro factores integrados— se gestiona en un solo lugar: la pestaña **Calidad de datos** del editor del tipo de tarjeta. (El editor se organiza en pestañas: General, Relaciones, Roles de partes interesadas y Calidad de datos; las traducciones están disponibles desde el icono del encabezado.)
 
 La importancia de cada factor se establece con un control deslizante simple de cuatro niveles, que también muestra el número subyacente:
 

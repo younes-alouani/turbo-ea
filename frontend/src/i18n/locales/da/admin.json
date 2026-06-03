@@ -105,6 +105,7 @@
   "metamodel.typeDrawer.key": "Nøgle",
   "metamodel.typeDrawer.addSubtype": "Tilføj undertype",
   "metamodel.typeDrawer.relations": "Relationer",
+  "metamodel.typeDrawer.tabMain": "Generelt",
   "metamodel.typeDrawer.noRelations": "Ingen relationer tilknyttet denne type.",
   "metamodel.typeDrawer.addRelation": "Tilføj relation",
   "metamodel.typeDrawer.visible": "Synlig",

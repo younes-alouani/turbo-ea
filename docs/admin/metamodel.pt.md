@@ -63,7 +63,7 @@ O nome de seção especial `__description` adiciona campos à seção de Descri�
 
 #### Pontuação de qualidade dos dados
 
-A pontuação de **qualidade dos dados** de um card mede de forma ponderada o quão completo ele está. Cada fator que contribui — cada campo e quatro fatores integrados — é gerido em um único lugar: a aba **Qualidade dos dados** do editor de tipo de card, aberta com o ícone de qualidade no topo (ao lado do ícone de tradução).
+A pontuação de **qualidade dos dados** de um card mede de forma ponderada o quão completo ele está. Cada fator que contribui — cada campo e quatro fatores integrados — é gerido em um único lugar: a aba **Qualidade dos dados** do editor de tipo de card. (O editor é organizado em abas — Geral, Relações, Papéis das partes interessadas e Qualidade dos dados — as traduções estão disponíveis no ícone do cabeçalho.)
 
 A importância de cada fator é definida com um controle deslizante simples de quatro níveis, que também mostra o número subjacente:
 

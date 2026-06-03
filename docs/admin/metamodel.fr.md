@@ -63,7 +63,7 @@ Le nom de section special `__description` ajoute les champs à la section Descri
 
 #### Évaluation de la qualité des données
 
-Le score de **qualité des données** d'une fiche mesure de manière pondérée son niveau de complétude. Chaque facteur contributeur – chaque champ ainsi que quatre facteurs intégrés – est géré au même endroit : l'onglet **Qualité des données** de l'éditeur de type de fiche, ouvert via l'icône de qualité en haut (à côté de l'icône de traduction).
+Le score de **qualité des données** d'une fiche mesure de manière pondérée son niveau de complétude. Chaque facteur contributeur – chaque champ ainsi que quatre facteurs intégrés – est géré au même endroit : l'onglet **Qualité des données** de l'éditeur de type de fiche. (L'éditeur est organisé en onglets – Principal, Relations, Rôles des parties prenantes et Qualité des données – les traductions sont accessibles via l'icône de l'en-tête.)
 
 L'importance de chaque facteur se règle avec un simple curseur à quatre niveaux, qui affiche aussi le nombre sous-jacent :
 

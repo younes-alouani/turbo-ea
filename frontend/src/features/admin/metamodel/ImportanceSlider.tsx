@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Box from "@mui/material/Box";
+import Chip from "@mui/material/Chip";
 import Slider from "@mui/material/Slider";
-import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 
@@ -47,6 +47,7 @@ interface ImportanceSliderProps {
 
 export default function ImportanceSlider({ value, onChange }: ImportanceSliderProps) {
   const { t } = useTranslation("admin");
+  const theme = useTheme();
   const tierColor = useTierColor();
 
   // Local tier mirrors the prop but updates instantly while dragging.
@@ -57,6 +58,9 @@ export default function ImportanceSlider({ value, onChange }: ImportanceSliderPr
 
   const color = tierColor(tier);
   const tierLabel = t(`metamodel.importance.${TIER_KEYS[tier]}`);
+  // The Ignore ramp colour is intentionally faint for the track; use a
+  // readable secondary tone for the chip so the weight is always legible.
+  const chipColor = tier === 0 ? theme.palette.text.secondary : color;
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
@@ -73,6 +77,7 @@ export default function ImportanceSlider({ value, onChange }: ImportanceSliderPr
         aria-label={t("metamodel.importance.label")}
         sx={{
           flex: 1,
+          minWidth: 80,
           color,
           py: 1,
           "& .MuiSlider-rail": { height: 6, opacity: 0.3 },
@@ -82,12 +87,18 @@ export default function ImportanceSlider({ value, onChange }: ImportanceSliderPr
           "& .MuiSlider-markActive": { bgcolor: "currentColor", opacity: 1 },
         }}
       />
-      <Typography
-        variant="caption"
-        sx={{ color, fontWeight: 700, width: 92, flexShrink: 0, textAlign: "right", whiteSpace: "nowrap" }}
-      >
-        {tierLabel} ({tier})
-      </Typography>
+      <Chip
+        size="small"
+        variant="outlined"
+        label={`${tierLabel} (${tier})`}
+        sx={{
+          flexShrink: 0,
+          fontWeight: 700,
+          color: chipColor,
+          borderColor: chipColor,
+          minWidth: 104,
+        }}
+      />
     </Box>
   );
 }

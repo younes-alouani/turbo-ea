@@ -105,6 +105,7 @@
   "metamodel.typeDrawer.key": "Clave",
   "metamodel.typeDrawer.addSubtype": "Agregar subtipo",
   "metamodel.typeDrawer.relations": "Relaciones",
+  "metamodel.typeDrawer.tabMain": "General",
   "metamodel.typeDrawer.noRelations": "No hay relaciones conectadas a este tipo.",
   "metamodel.typeDrawer.addRelation": "Agregar relación",
   "metamodel.typeDrawer.visible": "Visible",

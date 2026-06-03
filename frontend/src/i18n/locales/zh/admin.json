@@ -105,6 +105,7 @@
   "metamodel.typeDrawer.key": "键",
   "metamodel.typeDrawer.addSubtype": "添加子类型",
   "metamodel.typeDrawer.relations": "关系",
+  "metamodel.typeDrawer.tabMain": "主要",
   "metamodel.typeDrawer.noRelations": "此类型没有连接的关系。",
   "metamodel.typeDrawer.addRelation": "添加关系",
   "metamodel.typeDrawer.visible": "可见",

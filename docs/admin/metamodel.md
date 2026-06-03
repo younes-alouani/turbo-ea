@@ -63,7 +63,7 @@ The special section name `__description` adds fields to the Description section 
 
 #### Data quality scoring
 
-A card's **data quality** score is a weighted measure of how complete it is. Every contributing factor — each field plus four built-in factors — is managed in one place: the **Data quality** tab of the card-type editor, opened with the quality icon at the top (next to the translation icon).
+A card's **data quality** score is a weighted measure of how complete it is. Every contributing factor — each field plus four built-in factors — is managed in one place: the **Data quality** tab of the card-type editor. (The editor is organised into tabs — Main, Relations, Stakeholder roles, and Data quality — with translations available from the icon in the header.)
 
 Each factor has an importance set with a simple slider across four tiers, which also shows the underlying number:
 

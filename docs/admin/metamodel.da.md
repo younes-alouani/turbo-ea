@@ -63,7 +63,7 @@ Det særlige sektionsnavn `__description` tilføjer felter til Beskrivelsessekti
 
 #### Datakvalitetsscore
 
-Et korts **datakvalitetsscore** er et vægtet mål for, hvor komplet det er. Hver bidragende faktor – hvert felt samt fire indbyggede faktorer – håndteres ét sted: fanen **Datakvalitet** i korttypeeditoren, der åbnes med kvalitetsikonet øverst (ved siden af oversættelsesikonet).
+Et korts **datakvalitetsscore** er et vægtet mål for, hvor komplet det er. Hver bidragende faktor – hvert felt samt fire indbyggede faktorer – håndteres ét sted: fanen **Datakvalitet** i korttypeeditoren. (Editoren er organiseret i faner – Generelt, Relationer, Interessentroller og Datakvalitet – oversættelser er tilgængelige via ikonet i headeren.)
 
 Hver faktors vigtighed angives med en enkel skyder over fire niveauer, der også viser det underliggende tal:
 

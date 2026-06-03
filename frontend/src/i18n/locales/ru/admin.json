@@ -105,6 +105,7 @@
   "metamodel.typeDrawer.key": "Ключ",
   "metamodel.typeDrawer.addSubtype": "Добавить подтип",
   "metamodel.typeDrawer.relations": "Связи",
+  "metamodel.typeDrawer.tabMain": "Основное",
   "metamodel.typeDrawer.noRelations": "Нет связей, привязанных к этому типу.",
   "metamodel.typeDrawer.addRelation": "Добавить связь",
   "metamodel.typeDrawer.visible": "Видимый",

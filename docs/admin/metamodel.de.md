@@ -63,7 +63,7 @@ Der spezielle Abschnittsname `__description` fügt Felder zum Beschreibungsabsch
 
 #### Datenqualitätsbewertung
 
-Der **Datenqualitätswert** einer Karte ist ein gewichtetes Maß für ihre Vollständigkeit. Jeder beitragende Faktor – jedes Feld sowie vier integrierte Faktoren – wird an einer Stelle verwaltet: im **Datenqualität**-Tab des Kartentyp-Editors, das über das Qualitätssymbol oben (neben dem Übersetzungssymbol) geöffnet wird.
+Der **Datenqualitätswert** einer Karte ist ein gewichtetes Maß für ihre Vollständigkeit. Jeder beitragende Faktor – jedes Feld sowie vier integrierte Faktoren – wird an einer Stelle verwaltet: im **Datenqualität**-Tab des Kartentyp-Editors. (Der Editor ist in Registerkarten unterteilt – Allgemein, Beziehungen, Stakeholder-Rollen und Datenqualität – Übersetzungen sind über das Symbol in der Kopfzeile verfügbar.)
 
 Die Wichtigkeit jedes Faktors wird mit einem einfachen Schieberegler über vier Stufen festgelegt, der auch die zugrunde liegende Zahl anzeigt:
 

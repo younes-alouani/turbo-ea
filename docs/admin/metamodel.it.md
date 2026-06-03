@@ -63,7 +63,7 @@ Il nome speciale di sezione `__description` aggiunge campi alla sezione Descrizi
 
 #### Punteggio di qualità dei dati
 
-Il punteggio di **qualità dei dati** di una card misura in modo ponderato quanto è completa. Ogni fattore che contribuisce — ogni campo e quattro fattori integrati — è gestito in un unico posto: la scheda **Qualità dei dati** dell'editor del tipo di card, aperta con l'icona di qualità in alto (accanto all'icona di traduzione).
+Il punteggio di **qualità dei dati** di una card misura in modo ponderato quanto è completa. Ogni fattore che contribuisce — ogni campo e quattro fattori integrati — è gestito in un unico posto: la scheda **Qualità dei dati** dell'editor del tipo di card. (L'editor è organizzato in schede – Generale, Relazioni, Ruoli degli stakeholder e Qualità dei dati – le traduzioni sono disponibili dall'icona nell'intestazione.)
 
 L'importanza di ciascun fattore si imposta con un semplice cursore a quattro livelli, che mostra anche il numero sottostante:
 
