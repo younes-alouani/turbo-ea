@@ -4,6 +4,10 @@ import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
 import Snackbar from "@mui/material/Snackbar";
 import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
@@ -70,6 +74,7 @@ import {
   getNestedCardIds,
   applyViewToGraph,
   resetViewColors,
+  applyCardTypeIcons,
 } from "./drawio-shapes";
 import type {
   HierarchyChild,
@@ -772,6 +777,7 @@ export default function DiagramEditor() {
               name: other.name,
               type: other.type,
               color: ct?.color || "#999",
+              icon: ct?.icon,
               relationType: r.type,
               relationId: r.id,
             });
@@ -821,6 +827,11 @@ export default function DiagramEditor() {
    *  drill-down / roll-up child cells. */
   const colorForType = useCallback((typeKey: string): string => {
     return fsTypesRef.current.find((tp) => tp.key === typeKey)?.color || "#999";
+  }, []);
+
+  /** Card-type icon name for drill-down / roll-up child cells. */
+  const iconForType = useCallback((typeKey: string): string | undefined => {
+    return fsTypesRef.current.find((tp) => tp.key === typeKey)?.icon;
   }, []);
 
   /** Resolve a relation-type key (e.g. "appUsesItc") to its human-readable
@@ -880,6 +891,7 @@ export default function DiagramEditor() {
                 name: other.name,
                 type: other.type,
                 color: colorForType(other.type),
+                icon: iconForType(other.type),
                 relationType: r.type,
                 relationId: r.id,
               });
@@ -968,6 +980,7 @@ export default function DiagramEditor() {
             name: c.name,
             type: c.type,
             color: colorForType(c.type),
+            icon: iconForType(c.type),
           }));
         if (hChildren.length === 0) {
           setSnackMsg(t("editor.allChildrenAlreadyOnCanvas"));
@@ -1026,6 +1039,7 @@ export default function DiagramEditor() {
               name: s.name,
               type: s.type,
               color: colorForType(s.type),
+              icon: iconForType(s.type),
             },
           }));
         // Roll-up re-parents the current cell into the new container.
@@ -1101,6 +1115,7 @@ export default function DiagramEditor() {
               name: other.name,
               type: other.type,
               color: ct?.color || "#999",
+              icon: ct?.icon,
               relationType: r.type,
               relationId: r.id,
             });
@@ -1510,6 +1525,7 @@ export default function DiagramEditor() {
           cardType: card.type,
           name: card.name,
           color: ct.color,
+          icon: ct.icon,
         });
         if (ok) {
           const targetCellId = relinkTargetCellId;
@@ -1543,7 +1559,7 @@ export default function DiagramEditor() {
       }
 
       const cols = Math.min(4, cards.length);
-      const cellW = 200;
+      const cellW = 230;
       const cellH = 80;
       let insertedCount = 0;
       for (let i = 0; i < cards.length; i++) {
@@ -1557,6 +1573,7 @@ export default function DiagramEditor() {
           cardType: c.type,
           name: c.name,
           color: ct.color,
+          icon: ct.icon,
           x,
           y,
         });
@@ -1748,6 +1765,7 @@ export default function DiagramEditor() {
           type: data.type,
           name: data.name,
           color,
+          icon: typeInfo?.icon,
         });
         if (ok) {
           // The shape was previously a plain DrawIO vertex with no cardId,
@@ -1778,6 +1796,7 @@ export default function DiagramEditor() {
         type: data.type,
         name: data.name,
         color,
+        icon: typeInfo?.icon,
         x,
         y,
       });
@@ -2438,6 +2457,29 @@ export default function DiagramEditor() {
     }
   }, [view, collectCanvasCards, t]);
 
+  // Overflow ("More") menu for occasional / migration actions that don't
+  // warrant a permanent toolbar button.
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
+
+  /** Upgrade cards already on the canvas with their card-type icon. Lets users
+   *  add icons to diagrams created before the icon feature existed. */
+  const handleApplyIcons = useCallback(() => {
+    setMoreMenuAnchor(null);
+    const frame = iframeRef.current;
+    if (!frame) return;
+    const iconByType = new Map<string, string>(
+      fsTypesRef.current
+        .filter((tp) => tp.icon)
+        .map((tp) => [tp.key, tp.icon] as const),
+    );
+    const touched = applyCardTypeIcons(frame, iconByType);
+    setSnackMsg(
+      touched > 0
+        ? t("editor.toolbar.iconsApplied", { count: touched })
+        : t("editor.toolbar.iconsNoneToApply"),
+    );
+  }, [t]);
+
   // Re-apply the view whenever the user picks a new perspective or the
   // diagram object changes (xml loaded / saved). Synced-cell additions
   // also trigger re-application via syncOpen / refreshSyncPanel hooks.
@@ -2580,6 +2622,26 @@ export default function DiagramEditor() {
           {diagram.name}
         </Typography>
         {saving && <CircularProgress size={16} sx={{ ml: 1 }} />}
+
+        {/* Overflow menu for occasional actions (e.g. one-off migration of an
+            older diagram to show the card-type icons). */}
+        <Tooltip title={t("editor.toolbar.moreActions")}>
+          <IconButton size="small" onClick={(e) => setMoreMenuAnchor(e.currentTarget)}>
+            <MaterialSymbol icon="more_vert" size={20} />
+          </IconButton>
+        </Tooltip>
+        <Menu
+          anchorEl={moreMenuAnchor}
+          open={Boolean(moreMenuAnchor)}
+          onClose={() => setMoreMenuAnchor(null)}
+        >
+          <MenuItem onClick={handleApplyIcons}>
+            <ListItemIcon>
+              <MaterialSymbol icon="emoji_symbols" size={20} />
+            </ListItemIcon>
+            <ListItemText>{t("editor.toolbar.applyIcons")}</ListItemText>
+          </MenuItem>
+        </Menu>
 
         {/* View perspective dropdown (Phase 5) */}
         <ViewSelector

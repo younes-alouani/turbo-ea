@@ -7,6 +7,8 @@
  * it avoids XML merge root-cell conflicts and plugin lifecycle issues.
  */
 
+import { ICON_PATHS } from "./iconPaths";
+
 /** Darken a hex color by a factor (0-1) for stroke color */
 function darken(hex: string, factor = 0.25): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -19,11 +21,78 @@ function darken(hex: string, factor = 0.25): string {
   return `#${d(r)}${d(g)}${d(b)}`;
 }
 
+/**
+ * Build an SVG data-URI for a card-type icon (white glyph), or null when the
+ * icon name isn't in the bundled set. We ship real vector paths (see
+ * iconPaths.ts) rather than the Material Symbols font because font glyphs can't
+ * be reliably rasterised into images and the DrawIO iframe has no access to the
+ * app's webfont.
+ *
+ * The URI is `encodeURIComponent`-encoded, so it contains no raw `;` or `=` and
+ * is therefore safe to embed in an mxGraph style string (which is `;`/`=`
+ * delimited and split by the view-recolour helpers).
+ */
+function buildIconImage(icon?: string): string | null {
+  if (!icon) return null;
+  const entry = ICON_PATHS[icon];
+  if (!entry) return null;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${entry.vb}">` +
+    `<path fill="#ffffff" d="${entry.d}"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * Extra mxGraph style tokens that render the card-type icon as a small white
+ * glyph in the top-left corner of the shape. Returns [] when the icon isn't
+ * available, so cells fall back to the plain coloured rectangle.
+ *
+ * Using `shape=label` bakes the icon into the single cell — it drags, copies
+ * and exports with the shape, with no child cells or groups to manage.
+ */
+function iconStyleParts(icon?: string): string[] {
+  const image = buildIconImage(icon);
+  if (!image) return [];
+  return [
+    "shape=label",
+    `image=${image}`,
+    "imageAlign=left",
+    "imageVerticalAlign=top",
+    "imageWidth=18",
+    "imageHeight=18",
+    // `spacing` insets the icon from the top-left corner; `spacingLeft`
+    // reserves a matching left gutter for the label so the (centered) card
+    // name is always laid out to the right of the glyph and never overlaps it,
+    // even when it wraps to several lines.
+    "spacing=4",
+    "spacingLeft=24",
+  ];
+}
+
+/** Carry an existing cell's icon tokens across a full style rebuild. */
+function iconTokensFromStyle(style: string): string[] {
+  return (style || "")
+    .split(";")
+    .filter(Boolean)
+    .filter(
+      (p) =>
+        p === "shape=label" ||
+        p.startsWith("image=") ||
+        p.startsWith("imageAlign=") ||
+        p.startsWith("imageVerticalAlign=") ||
+        p.startsWith("imageWidth=") ||
+        p.startsWith("imageHeight=") ||
+        p.startsWith("spacing"),
+    );
+}
+
 export interface InsertCardOpts {
   cardId: string;
   cardType: string;
   name: string;
   color: string;
+  /** Card-type Material Symbols icon name (e.g. "apps"). Optional. */
+  icon?: string;
   x: number;
   y: number;
 }
@@ -45,7 +114,7 @@ export interface CardCellData {
  * Build the data for inserting a card shape via the mxGraph API.
  */
 export function buildCardCellData(opts: InsertCardOpts): CardCellData {
-  const { cardId, cardType, name, color, x, y } = opts;
+  const { cardId, cardType, name, color, icon, x, y } = opts;
   const stroke = darken(color);
   const cellId = `card-${cardId.slice(0, 8)}-${Date.now()}`;
 
@@ -60,6 +129,7 @@ export function buildCardCellData(opts: InsertCardOpts): CardCellData {
     "fontStyle=1",
     "arcSize=12",
     "shadow=1",
+    ...iconStyleParts(icon),
   ].join(";");
 
   return {
@@ -69,7 +139,7 @@ export function buildCardCellData(opts: InsertCardOpts): CardCellData {
     cardType,
     x,
     y,
-    width: 180,
+    width: 210,
     height: 60,
     style,
   };
@@ -174,7 +244,7 @@ export function extractCardIds(xml: string): string[] {
 /* ------------------------------------------------------------------ */
 
 /** Style for a pending (not-yet-synced) card cell — dashed border */
-function buildPendingStyle(color: string): string {
+function buildPendingStyle(color: string, icon?: string): string {
   const stroke = darken(color);
   return [
     "rounded=1", "whiteSpace=wrap", "html=1",
@@ -182,17 +252,19 @@ function buildPendingStyle(color: string): string {
     `strokeColor=${stroke}`, "fontSize=12",
     "fontStyle=1", "arcSize=12",
     "dashed=1", "dashPattern=5 3",
+    ...iconStyleParts(icon),
   ].join(";");
 }
 
 /** Style for a synced (normal) card cell */
-function buildSyncedStyle(color: string): string {
+function buildSyncedStyle(color: string, icon?: string): string {
   const stroke = darken(color);
   return [
     "rounded=1", "whiteSpace=wrap", "html=1",
     `fillColor=${color}`, "fontColor=#ffffff",
     `strokeColor=${stroke}`, "fontSize=12",
     "fontStyle=1", "arcSize=12", "shadow=1",
+    ...iconStyleParts(icon),
   ].join(";");
 }
 
@@ -202,7 +274,15 @@ function buildSyncedStyle(color: string): string {
  */
 export function insertPendingCard(
   iframe: HTMLIFrameElement,
-  opts: { tempId: string; type: string; name: string; color: string; x: number; y: number },
+  opts: {
+    tempId: string;
+    type: string;
+    name: string;
+    color: string;
+    icon?: string;
+    x: number;
+    y: number;
+  },
 ): string | null {
   const ctx = getMxGraph(iframe);
   if (!ctx) return null;
@@ -221,7 +301,16 @@ export function insertPendingCard(
 
   model.beginUpdate();
   try {
-    graph.insertVertex(parent, cellId, obj, opts.x, opts.y, 180, 60, buildPendingStyle(opts.color));
+    graph.insertVertex(
+      parent,
+      cellId,
+      obj,
+      opts.x,
+      opts.y,
+      210,
+      60,
+      buildPendingStyle(opts.color, opts.icon),
+    );
   } finally {
     model.endUpdate();
   }
@@ -295,7 +384,10 @@ export function markCellSynced(
       obj.setAttribute("cardId", realCardId);
       if (obj.removeAttribute) obj.removeAttribute("pending");
     }
-    model.setStyle(cell, buildSyncedStyle(color));
+    // Carry the pending cell's icon tokens across the dashed→solid restyle.
+    const carried = iconTokensFromStyle((model.getStyle(cell) || "") as string);
+    const base = buildSyncedStyle(color);
+    model.setStyle(cell, carried.length ? `${base};${carried.join(";")}` : base);
   } finally {
     model.endUpdate();
   }
@@ -499,7 +591,7 @@ const CHEVRON_OVERLAY = `data:image/svg+xml,${encodeURIComponent(
     '</svg>',
 )}`;
 
-const CHILD_CARD_W = 160;
+const CHILD_CARD_W = 190;
 const CHILD_CARD_H = 40;
 const CHILD_GAP_Y = 10;
 const CHILD_GAP_X = 60;
@@ -522,6 +614,8 @@ export interface ExpandChildData {
   name: string;
   type: string;
   color: string;
+  /** Card-type Material Symbols icon name. Optional. */
+  icon?: string;
   relationType: string;
   /** Backend relation id, when known. Stamped onto the connecting edge so
    *  canvas deletions can fire `DELETE /relations/{id}`. */
@@ -621,6 +715,7 @@ export function expandCardGroup(
         `fillColor=${ch.color}`, "fontColor=#ffffff",
         `strokeColor=${stroke}`, "fontSize=11",
         "fontStyle=1", "arcSize=12",
+        ...iconStyleParts(ch.icon),
       ].join(";");
 
       const xmlDoc = win.mxUtils.createXmlDocument();
@@ -1800,7 +1895,7 @@ export function unlinkCell(
 export function relinkCell(
   iframe: HTMLIFrameElement,
   cellId: string,
-  opts: { cardId: string; cardType: string; name: string; color: string },
+  opts: { cardId: string; cardType: string; name: string; color: string; icon?: string },
 ): boolean {
   const ctx = getMxGraph(iframe);
   if (!ctx) return false;
@@ -1838,7 +1933,7 @@ export function relinkCell(
       value.removeAttribute("childCellIds");
     }
     if (wasCardShaped) {
-      model.setStyle(cell, buildSyncedStyle(opts.color));
+      model.setStyle(cell, buildSyncedStyle(opts.color, opts.icon));
     } else {
       // Preserve the user's shape — only update fill + stroke + font
       // colour so the cell visibly belongs to the target card type
@@ -1915,7 +2010,7 @@ export function getCellLabel(iframe: HTMLIFrameElement, cellId: string): string 
 export function convertShapeToPendingCard(
   iframe: HTMLIFrameElement,
   cellId: string,
-  opts: { tempId: string; type: string; name: string; color: string },
+  opts: { tempId: string; type: string; name: string; color: string; icon?: string },
 ): boolean {
   const ctx = getMxGraph(iframe);
   if (!ctx) return false;
@@ -1934,7 +2029,7 @@ export function convertShapeToPendingCard(
     obj.setAttribute("cardType", opts.type);
     obj.setAttribute("pending", "1");
     model.setValue(cell, obj);
-    model.setStyle(cell, buildPendingStyle(opts.color));
+    model.setStyle(cell, buildPendingStyle(opts.color, opts.icon));
     graph.refresh(cell);
   } finally {
     model.endUpdate();
@@ -2587,6 +2682,7 @@ function insertChildVertex(
     "fontSize=11",
     "fontStyle=1",
     "arcSize=12",
+    ...iconStyleParts(ch.icon),
   ].join(";");
 
   const xmlDoc = win.mxUtils.createXmlDocument();
@@ -2724,6 +2820,8 @@ export interface HierarchyChild {
   name: string;
   type: string;
   color: string;
+  /** Card-type Material Symbols icon name. Optional. */
+  icon?: string;
 }
 
 /**
@@ -2752,7 +2850,7 @@ export function drillDownInto(
   // Layout constants tuned to feel like LeanIX's container drill-down.
   const HEADER = 28;
   const PAD = 12;
-  const CHILD_W = 150;
+  const CHILD_W = 180;
   const CHILD_H = 50;
   const GAP = 10;
 
@@ -2833,6 +2931,7 @@ export function drillDownInto(
         "fontSize=11",
         "fontStyle=1",
         "arcSize=12",
+        ...iconStyleParts(ch.icon),
       ].join(";");
 
       const xmlDoc = win.mxUtils.createXmlDocument();
@@ -2892,7 +2991,7 @@ export function rollUpInto(
   // missing ones are freshly inserted.
   const HEADER = 28;
   const PAD = 12;
-  const CHILD_W = 150;
+  const CHILD_W = 180;
   const CHILD_H = 50;
   const GAP = 10;
   const count = 1 + siblings.length;
@@ -2971,6 +3070,7 @@ export function rollUpInto(
         "fontSize=11",
         "fontStyle=1",
         "arcSize=12",
+        ...iconStyleParts(card.icon),
       ].join(";");
 
       const childObj = xmlDoc.createElement("object");
@@ -3082,6 +3182,69 @@ export function resetViewColors(
         .join(";");
       model.setStyle(cell, next);
       touched += 1;
+    }
+  } finally {
+    model.endUpdate();
+  }
+  return touched;
+}
+
+/**
+ * Add (or refresh) the card-type icon on every card-shaped cell already on the
+ * canvas. Used by the "Apply card-type icons" toolbar action so cards placed on
+ * a diagram before the icon feature existed can be upgraded in one click.
+ *
+ * Only touches rounded-rect card cells (those carrying a `cardType` attribute);
+ * swimlane containers, ellipses, images and other hand-drawn shapes are skipped
+ * so their geometry is preserved. The operation is additive and idempotent —
+ * existing icon tokens are stripped and re-applied from the current metamodel,
+ * so it also corrects any drift. Cells whose type has no bundled icon are left
+ * as a plain coloured rectangle.
+ */
+export function applyCardTypeIcons(
+  iframe: HTMLIFrameElement,
+  iconByType: Map<string, string>,
+): number {
+  const ctx = getMxGraph(iframe);
+  if (!ctx) return 0;
+  const { graph } = ctx;
+  const model = graph.getModel();
+  const cells = model.cells || {};
+  let touched = 0;
+  model.beginUpdate();
+  try {
+    for (const k of Object.keys(cells)) {
+      const cell = cells[k];
+      if (!cell?.value?.getAttribute) continue;
+      if (cell.edge) continue;
+      const cardType = cell.value.getAttribute("cardType");
+      if (!cardType) continue;
+      const styleStr = (model.getStyle(cell) || "") as string;
+      // Preserve swimlane containers / ellipses / images / user shapes — only
+      // our default-rectangle card cells (no `shape=`) and already-iconed
+      // `shape=label` cells are eligible.
+      const shapeMatch = styleStr.match(/(?:^|;)shape=([^;]+)/);
+      if (shapeMatch && shapeMatch[1] !== "label") continue;
+      const kept = styleStr
+        .split(";")
+        .filter(Boolean)
+        .filter(
+          (p) =>
+            !(
+              p === "shape=label" ||
+              p.startsWith("image=") ||
+              p.startsWith("imageAlign=") ||
+              p.startsWith("imageVerticalAlign=") ||
+              p.startsWith("imageWidth=") ||
+              p.startsWith("imageHeight=") ||
+              p.startsWith("spacing")
+            ),
+        );
+      const next = kept.concat(iconStyleParts(iconByType.get(cardType))).join(";");
+      if (next !== styleStr) {
+        model.setStyle(cell, next);
+        touched += 1;
+      }
     }
   } finally {
     model.endUpdate();
