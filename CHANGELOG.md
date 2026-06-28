@@ -5,6 +5,20 @@ All notable changes to Turbo EA are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.57.0] - 2026-06-27
+
+### Added
+- **Redesigned Diagrams gallery.** Diagram cards are now more compact, and a left **filter sidebar** narrows the gallery to *All diagrams*, *Created by me*, or your *Favorites*. A **search box** matches a diagram's name, its author, and the names of the cards drawn inside it. Diagrams can be organized into **groups** — shared, workspace-wide labels that a diagram can belong to several of at once — shown as collapsible headings with anything unassigned under *Ungrouped*. Each card has a **favorite** star (per user), and a *Sort* control orders by recently updated, recently created, or name. Diagram groups, their membership, and favorites are included in **Workspace Transfer**, so they clone between instances along with the diagrams.
+
+### Removed
+- **Removed the unused Data Flow / Free Draw diagram type.** The distinction was never used by any feature; diagrams are now a single kind.
+- **Removed the Diagrams list/table view.** The gallery is now card-only, with grouping, search, and filters.
+
+### Fixed
+- **The diagram editor's "Save & Exit" button now works.** Clicking *Save & Exit* in the DrawIO toolbar saves the diagram and returns to the viewer; previously it neither saved nor exited.
+- **The Diagrams filter sidebar matches the inventory sidebar and is collapsible.** Same colours and styling; it collapses to a slim rail via a chevron on desktop (width and state remembered, drag-to-resize) and opens as a slide-in panel on mobile.
+- **Adding a diagram to a group now updates the gallery instantly** instead of requiring a page refresh.
+
 ## [1.56.0] - 2026-06-27
 
 ### Added

@@ -790,10 +790,23 @@ export interface DiagramSummary {
   id: string;
   name: string;
   description?: string;
-  type: string;
   card_ids: string[];
+  group_ids?: string[];
   thumbnail?: string;
   card_count: number;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  is_favorite?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DiagramGroup {
+  id: string;
+  name: string;
+  color?: string | null;
+  sort_order: number;
+  diagram_count: number;
   created_at?: string;
   updated_at?: string;
 }
